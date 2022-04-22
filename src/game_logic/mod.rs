@@ -21,17 +21,33 @@ impl Corridor {
     }
 
     pub fn new_border(&mut self, border: (usize, usize), border_type: &str) -> bool {
-        if border.0 <= 7 || border.1 <= 7 {
-            if self.border_is_possible(border, border_type) {
-                match border_type {
-                    "h" => self.horizontal_borders.push(border),
-                    "v" => self.vertcal_borders.push(border),
-                    _ => (),
-                };
-                return true;
-            }
+        if border.0 > 7 || border.1 > 7 {
+            return false;
         }
-        false
+        if self.border_is_possible(border, border_type) {
+            return false;
+        }
+        match border_type {
+            "h" => self.horizontal_borders.push(border),
+            "v" => self.vertcal_borders.push(border),
+            _ => return false,
+        };
+        if self.player_can_win(self.up_player, &mut Vec::new(), 8, 0)
+            && self.player_can_win(self.down_player, &mut Vec::new(), 0, 0)
+        {
+            return true;
+        }
+        match border_type {
+            "h" => {
+                self.horizontal_borders.pop();
+                return false;
+            }
+            "v" => {
+                self.vertcal_borders.pop();
+                return false;
+            }
+            _ => return false,
+        }
     }
 
     fn border_is_possible(&self, new_border: (usize, usize), border_type: &str) -> bool {
