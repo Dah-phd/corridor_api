@@ -18,16 +18,9 @@ struct GameData {
 async fn new_game() {}
 
 fn main() {
-    let mut game = game_logic::Corridor::new("9801234781".to_owned(), "dah".to_owned(), "pesho".to_owned());
-    game.print_state();
-
-    if vec![3, 4].contains(&3) {
-        let mut b: usize = 3;
-        let mut c: usize = 4;
-    }
-    let mut vec = vec![1, 2, 3];
-    vec.pop();
-    println!("{:?}", vec)
+    let m = if 3 > 4 { 3 } else { 4 };
+    println!("{}", m);
+    let mut game = game_logic::Corridor::new();
 }
 
 // #[launch]

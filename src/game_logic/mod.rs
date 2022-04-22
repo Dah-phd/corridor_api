@@ -1,153 +1,85 @@
-mod components;
+use std::cmp::min;
 
+#[derive(Debug, Clone)]
 pub struct Corridor {
-    up_player: String,
-    down_player: String,
-    pub id: String,
-    pub board: components::Board,
-    pub borders: components::Borders,
+    pub up_player: (usize, usize),
+    pub down_player: (usize, usize),
+    pub vertcal_borders: Vec<(usize, usize)>,    // (row, col)
+    pub horizontal_borders: Vec<(usize, usize)>, // (row, col)
     pub winner: Option<bool>,
 }
 
 impl Corridor {
-    pub fn new(id: String, up_player: String, down_player: String) -> Corridor {
+    pub fn new() -> Corridor {
         Corridor {
-            id: id,
-            up_player: up_player,
-            down_player: down_player,
-            board: components::Board::new(),
-            borders: components::Borders::new(),
+            up_player: (0, 4),
+            down_player: (8, 4),
+            vertcal_borders: Vec::new(),
+            horizontal_borders: Vec::new(),
             winner: None,
         }
     }
-    pub fn print_state(&self) {
-        for row_id in 0..9 {
-            for col_id in 0..9 {
-                if self.board.player_up == (row_id, col_id) {
-                    print!("[U]")
-                } else if self.board.player_down == (row_id, col_id) {
-                    print!("[D]")
-                } else {
-                    print!("[ ]")
-                }
-            }
-            print!("\n")
-        }
-    }
-    pub fn move_up_player(&mut self, new_position: (usize, usize)) -> bool {
-        self.move_player(new_position, self.board.player_up, "up")
-    }
-    pub fn move_down_player(&mut self, new_position: (usize, usize)) -> bool {
-        self.move_player(new_position, self.board.player_down, "down")
-    }
 
-    fn move_player(&mut self, new_position: (usize, usize), old_position: (usize, usize), player: &str) -> bool {
-        if self.is_move_possible(old_position, new_position) {
-            self.is_win(player, new_position);
-            self.board.move_player(player, new_position)
-        } else {
-            false
-        }
-    }
-    fn is_win(&self, player: &str, new_position: (usize, usize)) -> bool {
-        if player == "up" {
+    pub fn new_border(&mut self, border: (usize, usize), border_type: &str) -> bool {
+        if self.border_is_possible(border, border_type) {
+            match border_type {
+                "h" => self.horizontal_borders.push(border),
+                "v" => self.vertcal_borders.push(border),
+                _ => (),
+            };
             return true;
         }
         false
     }
 
-    fn is_move_possible(&self, old_position: (usize, usize), new_position: (usize, usize)) -> bool {
-        if self.is_move_blocked_by_border_or_wrong(old_position, new_position) {
-            return false;
+    fn border_is_possible(&self, new_border: (usize, usize), border_type: &str) -> bool {
+        match border_type {
+            "h" => {}
+            "v" => {}
+            _ => (),
         }
-        if new_position.0 > 8 || new_position.1 > 8 {
-            return false;
-        }
-        true
+        false
     }
 
-    fn is_move_blocked_by_border_or_wrong(&self, old_position: (usize, usize), new_position: (usize, usize)) -> bool {
-        // positon based on (row_idx, col_idx)
-        if old_position.0 == new_position.0 {
-            if old_position.1 > new_position.1 {
-                if old_position.1 - new_position.1 == 1 && !self.borders.v_borders.contains(&(new_position.0, new_position.1)) {
-                    return false;
-                } else if old_position.1 - new_position.1 == 2
-                    && !self.borders.v_borders.contains(&(new_position.0, new_position.1))
-                    && !self.borders.v_borders.contains(&(new_position.0, new_position.1 - 1))
-                {
-                    return false;
-                } else {
-                    return true;
-                }
-            } else if old_position.1 < new_position.1 {
-                if new_position.1 - old_position.1 == 1 && !self.borders.v_borders.contains(&(new_position.0, old_position.1)) {
-                    return false;
-                } else if new_position.1 - old_position.1 == 2
-                    && !self.borders.v_borders.contains(&(new_position.0, old_position.1))
-                    && !self.borders.v_borders.contains(&(new_position.0, old_position.1 + 1))
-                {
-                    return false;
-                } else {
-                    return true;
-                }
-            }
-        } else if old_position.1 == new_position.1 {
-            if old_position.0 > new_position.0 {
-                if old_position.0 - new_position.0 == 1 && self.borders.h_borders.contains(&(new_position.0, old_position.1)) {
-                    return false;
-                } else if old_position.0 - new_position.0 == 2
-                    && self.borders.h_borders.contains(&(new_position.0, old_position.1))
-                    && self.borders.h_borders.contains(&(new_position.0 - 1, old_position.1))
-                {
-                    return false;
-                } else {
-                    return true;
-                }
-            } else if old_position.0 < new_position.0 {
-                if new_position.0 - old_position.0 == 1 && self.borders.h_borders.contains(&(new_position.0, old_position.1)) {
-                    return false;
-                } else if new_position.0 - old_position.0 == 2
-                    && self.borders.h_borders.contains(&(new_position.0, old_position.1))
-                    && self.borders.h_borders.contains(&(new_position.0 + 1, old_position.1))
-                {
-                    return false;
-                } else {
-                    return true;
-                }
+    fn is_move_blocked_by_border_or_wrong(&self, start_position: (usize, usize), possible_path: (usize, usize)) -> bool {
+        if start_position.0 == possible_path.0 {
+            let column_move = if possible_path.1 > start_position.1 {
+                (start_position.1, possible_path.1)
             } else {
+                (possible_path.1, start_position.1)
+            };
+            if column_move.1 - column_move.0 != 1 {
                 return true;
             }
+            for border in &self.vertcal_borders {
+                if border.0 == start_position.0 && border.1 == column_move.0 {
+                    return true;
+                }
+                if start_position.0 != 0 && border.0 == start_position.0 - 1 && border.1 == column_move.0 {
+                    return true;
+                }
+            }
+            return false;
+        } else if start_position.1 == possible_path.1 {
+            let row_move = if possible_path.0 > start_position.0 {
+                (start_position.0, possible_path.0)
+            } else {
+                (possible_path.0, start_position.0)
+            };
+            if row_move.1 - row_move.0 != 1 {
+                return true;
+            };
+            for border in &self.horizontal_borders {
+                if border.1 == start_position.1 && border.0 == row_move.0 {
+                    return true;
+                }
+                if start_position.1 != 0 && border.1 == start_position.1 - 1 && border.0 == row_move.0 {
+                    return true;
+                }
+            }
+            return false;
         }
         true
-    }
-
-    pub fn new_border(&mut self, border: (usize, usize), border_type: String) -> bool {
-        // border could be "h" for horizontal or "v" for vertical and holds the (row_idx, col_idx) for first point
-        if border_type == "h" && !self.borders.h_borders.contains(&border) || !self.borders.h_borders.contains(&border) {
-            return false;
-        }
-        if border_type == "v" && !self.borders.v_borders.contains(&border) || !self.borders.v_borders.contains(&border) {
-            return false;
-        }
-        self.borders.add_borders(border.0, border.1, &border_type);
-        if !self.blocks_player(&border, &border_type) {
-            return true;
-        } else {
-            self.borders.remove(&border_type);
-            false
-        }
-    }
-
-    fn blocks_player(&self, border: &(usize, usize), border_type: &str) -> bool {
-        // check if step over other border
-        if !self.player_can_win(self.board.player_up, &mut vec![self.board.player_up], 0, 0) {
-            return true;
-        }
-        if !self.player_can_win(self.board.player_down, &mut vec![self.board.player_down], 8, 0) {
-            return true;
-        }
-        false
     }
 
     fn player_can_win(
@@ -183,13 +115,5 @@ impl Corridor {
             }
         }
         false
-    }
-}
-
-fn get_usize_diff(x: usize, y: usize) -> usize {
-    if x > y {
-        return x - y;
-    } else {
-        return y - x;
     }
 }
