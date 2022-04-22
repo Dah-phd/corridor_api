@@ -18,8 +18,7 @@ struct GameData {
 async fn new_game() {}
 
 fn main() {
-    let m = if 3 > 4 { 3 } else { 4 };
-    println!("{}", m);
+    println!("{}", (1, 2) == (1, 2));
     let mut game = game_logic::Corridor::new();
 }
 

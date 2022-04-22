@@ -21,24 +21,56 @@ impl Corridor {
     }
 
     pub fn new_border(&mut self, border: (usize, usize), border_type: &str) -> bool {
-        if self.border_is_possible(border, border_type) {
-            match border_type {
-                "h" => self.horizontal_borders.push(border),
-                "v" => self.vertcal_borders.push(border),
-                _ => (),
-            };
-            return true;
+        if border.0 <= 7 || border.1 <= 7 {
+            if self.border_is_possible(border, border_type) {
+                match border_type {
+                    "h" => self.horizontal_borders.push(border),
+                    "v" => self.vertcal_borders.push(border),
+                    _ => (),
+                };
+                return true;
+            }
         }
         false
     }
 
     fn border_is_possible(&self, new_border: (usize, usize), border_type: &str) -> bool {
         match border_type {
-            "h" => {}
-            "v" => {}
-            _ => (),
+            "h" => {
+                for border in &self.horizontal_borders {
+                    if *border == new_border {
+                        return false;
+                    }
+                    if border.1 <= 6 && (border.0, border.1 + 1) == new_border {
+                        return false;
+                    }
+                    if border.1 >= 1 && (border.0, border.1 - 1) == new_border {
+                        return false;
+                    }
+                }
+                if self.vertcal_borders.contains(&new_border) {
+                    return false;
+                }
+            }
+            "v" => {
+                for border in &self.vertcal_borders {
+                    if *border == new_border {
+                        return false;
+                    }
+                    if border.0 <= 6 && (border.0 + 1, border.1) == new_border {
+                        return false;
+                    }
+                    if border.0 >= 1 && (border.0 - 1, border.1 - 1) == new_border {
+                        return false;
+                    }
+                }
+                if self.horizontal_borders.contains(&new_border) {
+                    return false;
+                }
+            }
+            _ => return false,
         }
-        false
+        true
     }
 
     fn is_move_blocked_by_border_or_wrong(&self, start_position: (usize, usize), possible_path: (usize, usize)) -> bool {
