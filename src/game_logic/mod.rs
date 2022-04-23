@@ -20,6 +20,28 @@ impl Corridor {
         }
     }
 
+    pub fn move_player(&mut self, new_position: (usize, usize), player: &str) -> bool {
+        match player {
+            "up" => {
+                if self.is_move_blocked_by_border_or_wrong(self.up_player, new_position) {
+                    return false;
+                } else {
+                    self.up_player = new_position;
+                    return true;
+                }
+            }
+            "down" => {
+                if self.is_move_blocked_by_border_or_wrong(self.down_player, new_position) {
+                    return false;
+                } else {
+                    self.down_player = new_position;
+                    return true;
+                }
+            }
+            _ => return false,
+        }
+    }
+
     pub fn new_border(&mut self, border: (usize, usize), border_type: &str) -> bool {
         if border.0 > 7 || border.1 > 7 {
             return false;
@@ -27,27 +49,22 @@ impl Corridor {
         if self.border_is_possible(border, border_type) {
             return false;
         }
-        match border_type {
-            "h" => self.horizontal_borders.push(border),
-            "v" => self.vertcal_borders.push(border),
-            _ => return false,
+        if border_type == "h" {
+            self.horizontal_borders.push(border)
+        } else {
+            self.vertcal_borders.push(border)
         };
         if self.player_can_win(self.up_player, &mut Vec::new(), 8, 0)
             && self.player_can_win(self.down_player, &mut Vec::new(), 0, 0)
         {
             return true;
         }
-        match border_type {
-            "h" => {
-                self.horizontal_borders.pop();
-                return false;
-            }
-            "v" => {
-                self.vertcal_borders.pop();
-                return false;
-            }
-            _ => return false,
-        }
+        if border_type == "h" {
+            self.horizontal_borders.pop();
+        } else {
+            self.vertcal_borders.pop();
+        };
+        false
     }
 
     fn border_is_possible(&self, new_border: (usize, usize), border_type: &str) -> bool {
@@ -76,7 +93,7 @@ impl Corridor {
                     if border.0 <= 6 && (border.0 + 1, border.1) == new_border {
                         return false;
                     }
-                    if border.0 >= 1 && (border.0 - 1, border.1 - 1) == new_border {
+                    if border.0 >= 1 && (border.0 - 1, border.1) == new_border {
                         return false;
                     }
                 }
