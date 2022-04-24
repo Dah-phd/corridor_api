@@ -1,6 +1,8 @@
-use std::cmp::min;
+extern crate rocket;
+use rocket::fs::{relative, FileServer};
+use rocket::serde::{Deserialize, Serialize};
+use std::time::Instant;
 
-#[derive(Debug, Clone)]
 pub struct Corridor {
     pub up_player: (usize, usize),
     pub down_player: (usize, usize),
@@ -46,7 +48,7 @@ impl Corridor {
         if border.0 > 7 || border.1 > 7 {
             return false;
         }
-        if self.border_is_possible(border, border_type) {
+        if !self.border_is_possible(border, border_type) {
             return false;
         }
         if border_type == "h" {
@@ -168,14 +170,16 @@ impl Corridor {
                 possible_paths.push((start_position.0, start_position.1 - 1));
             }
             if start_position.1 < 8 {
-                possible_paths.push((start_position.0, start_position.1 - 1));
+                possible_paths.push((start_position.0, start_position.1 + 1));
             }
             for possible_path in possible_paths {
                 if !past_position.contains(&possible_path)
                     && !self.is_move_blocked_by_border_or_wrong(start_position, possible_path)
-                    && self.player_can_win(possible_path, past_position, target, target_coordinate)
                 {
-                    return true;
+                    past_position.push(possible_path);
+                    if self.player_can_win(possible_path, past_position, target, target_coordinate) {
+                        return true;
+                    }
                 }
             }
         }

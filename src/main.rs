@@ -3,16 +3,9 @@ extern crate rocket;
 use rocket::fs::{relative, FileServer};
 use rocket::serde::{Deserialize, Serialize};
 mod game_logic;
-
-#[derive(Debug, Clone, FromForm, Serialize, Deserialize)]
-#[serde(crate = "rocket::serde")]
-struct GameData {
-    #[field(validate = len(..30))]
-    pub id: String,
-    #[field(validate = len(..20))]
-    pub player_up: String,
-    pub player_down: String,
-}
+use game_logic::Corridor;
+mod session;
+use std::time::Instant;
 
 #[get("/messages")]
 async fn new_game() {}
@@ -37,9 +30,9 @@ fn print_state(game: &game_logic::Corridor) {
             if game.horizontal_borders.contains(&(row_id, col_id))
                 || col_id >= 1 && game.horizontal_borders.contains(&(row_id, col_id - 1))
             {
-                underline.push_str("---")
+                underline.push_str("----")
             } else {
-                underline.push_str("   ")
+                underline.push_str("    ")
             }
         }
         println!("{line}");
@@ -51,12 +44,24 @@ fn main() {
     let mut game = game_logic::Corridor::new();
     print_state(&game);
     println!();
-    println!("{}", game.move_player((1, 4), "up"));
+    println!("{}", game.new_border((1, 1), "h"));
+    println!("{}", game.new_border((1, 0), "v"));
+    println!("{}", game.new_border((2, 4), "v"));
+
+    println!("{}", game.new_border((1, 3), "h"));
+    println!("{}", game.new_border((3, 5), "h"));
+    println!("{}", game.new_border((1, 7), "h"));
+
+    println!("{}", game.new_border((2, 6), "v"));
+
+    println!("{}", game.new_border((0, 0), "h"));
+
     print_state(&game);
     println!();
     println!("{}", game.move_player((7, 4), "down"));
     print_state(&game);
     println!();
+    println!("{:?}", Instant::now());
 }
 
 // #[launch]
