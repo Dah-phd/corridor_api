@@ -1,47 +1,64 @@
 #[macro_use]
 extern crate rocket;
-use rocket::fs::{relative, FileServer};
 use rocket::serde::{Deserialize, Serialize};
 mod game_logic;
-use game_logic::Corridor;
+use game_logic::{print_state, Corridor};
 mod session;
+use session::GameSession;
 use std::time::Instant;
 
-#[get("/messages")]
-async fn new_game() {}
+#[get("/status/update/<session>")]
+async fn get_state(session: i64) {}
 
-fn print_state(game: &game_logic::Corridor) {
-    for row_id in 0..9 {
-        let mut line = String::new();
-        let mut underline = String::new();
-        for col_id in 0..9 {
-            if (row_id, col_id) == game.up_player || (row_id, col_id) == game.down_player {
-                line.push_str("[X]");
-            } else {
-                line.push_str("[ ]")
-            }
-            if game.vertcal_borders.contains(&(row_id, col_id))
-                || row_id >= 1 && game.vertcal_borders.contains(&(row_id - 1, col_id))
-            {
-                line.push_str("|")
-            } else {
-                line.push_str(" ")
-            }
-            if game.horizontal_borders.contains(&(row_id, col_id))
-                || col_id >= 1 && game.horizontal_borders.contains(&(row_id, col_id - 1))
-            {
-                underline.push_str("----")
-            } else {
-                underline.push_str("    ")
-            }
+#[get("/events")]
+async fn events(
+    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Corridor>>,
+    mut end: rocket::Shutdown,
+) -> rocket::response::stream::EventStream![] {
+    let mut rx = queue.subscribe();
+    rocket::response::stream::EventStream! {
+        loop {
+            let msg = rocket::tokio::select! {
+                msg = rx.recv() => match msg {
+                    Ok(msg) => msg,
+                    Err(rocket::tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    Err(rocket::tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                },
+                _ = &mut end => break,
+            };
+
+            yield rocket::response::stream::Event::json(&msg);
         }
-        println!("{line}");
-        println!("{underline}")
     }
 }
 
-fn main() {
-    let mut game = game_logic::Corridor::new();
+#[get("/test")]
+fn board() -> String {
+    let mut new_game = Corridor::new();
+    let result = match rocket::serde::json::serde_json::to_string(&new_game) {
+        Ok(v) => return v,
+        _ => return "error".to_owned(),
+    };
+}
+
+#[derive(Debug, Clone, FromForm, Serialize, Deserialize)]
+#[cfg_attr(test, derive(PartialEq, UriDisplayQuery))]
+#[serde(crate = "rocket::serde")]
+struct Trigger {
+    pub message: String,
+}
+
+#[launch]
+fn rocket() -> _ {
+    let ACTIVE_SESSIONS: Vec<GameSession> = Vec::new();
+    rocket::build()
+        .manage(rocket::tokio::sync::broadcast::channel::<Corridor>(1024).0)
+        .mount("/", routes![events, board])
+        .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static")))
+}
+
+fn main_() -> Corridor {
+    let mut game = Corridor::new();
     print_state(&game);
     println!();
     println!("{}", game.new_border((1, 1), "h"));
@@ -62,12 +79,5 @@ fn main() {
     print_state(&game);
     println!();
     println!("{:?}", Instant::now());
+    game
 }
-
-// #[launch]
-// fn rocket() -> _ {
-//     let asd = Board::new();
-//     rocket::build()
-//         .mount("/", routes![new_game])
-//         .mount("/", FileServer::from(relative!("static")))
-// }

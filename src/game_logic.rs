@@ -3,6 +3,8 @@ use rocket::fs::{relative, FileServer};
 use rocket::serde::{Deserialize, Serialize};
 use std::time::Instant;
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(crate = "rocket::serde")]
 pub struct Corridor {
     pub up_player: (usize, usize),
     pub down_player: (usize, usize),
@@ -163,14 +165,14 @@ impl Corridor {
             if start_position.0 > 0 {
                 possible_paths.push((start_position.0 - 1, start_position.1));
             }
+            if start_position.1 < 8 {
+                possible_paths.push((start_position.0, start_position.1 + 1));
+            }
             if start_position.0 < 8 {
                 possible_paths.push((start_position.0 + 1, start_position.1))
             }
             if start_position.1 > 0 {
                 possible_paths.push((start_position.0, start_position.1 - 1));
-            }
-            if start_position.1 < 8 {
-                possible_paths.push((start_position.0, start_position.1 + 1));
             }
             for possible_path in possible_paths {
                 if !past_position.contains(&possible_path)
@@ -184,5 +186,35 @@ impl Corridor {
             }
         }
         false
+    }
+}
+
+pub fn print_state(game: &Corridor) {
+    for row_id in 0..9 {
+        let mut line = String::new();
+        let mut underline = String::new();
+        for col_id in 0..9 {
+            if (row_id, col_id) == game.up_player || (row_id, col_id) == game.down_player {
+                line.push_str("[X]");
+            } else {
+                line.push_str("[ ]")
+            }
+            if game.vertcal_borders.contains(&(row_id, col_id))
+                || row_id >= 1 && game.vertcal_borders.contains(&(row_id - 1, col_id))
+            {
+                line.push_str("|")
+            } else {
+                line.push_str(" ")
+            }
+            if game.horizontal_borders.contains(&(row_id, col_id))
+                || col_id >= 1 && game.horizontal_borders.contains(&(row_id, col_id - 1))
+            {
+                underline.push_str("----")
+            } else {
+                underline.push_str("    ")
+            }
+        }
+        println!("{line}");
+        println!("{underline}")
     }
 }
