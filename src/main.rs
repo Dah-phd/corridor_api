@@ -4,7 +4,7 @@ use rocket::serde::{Deserialize, Serialize};
 mod game_logic;
 use game_logic::{print_state, Corridor};
 mod session;
-use session::GameSession;
+use session::CorridorSession;
 use std::time::Instant;
 
 #[get("/status/update/<session>")]
@@ -48,14 +48,15 @@ struct Trigger {
     pub message: String,
 }
 
-#[launch]
-fn rocket() -> _ {
-    let ACTIVE_SESSIONS: Vec<GameSession> = Vec::new();
-    rocket::build()
-        .manage(rocket::tokio::sync::broadcast::channel::<Corridor>(1024).0)
-        .mount("/", routes![events, board])
-        .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static")))
-}
+// #[launch]
+// fn rocket() -> _ {
+//     main__();
+//     let ACTIVE_SESSIONS: Vec<CorridorSession> = Vec::new();
+//     rocket::build()
+//         .manage(rocket::tokio::sync::broadcast::channel::<Corridor>(1024).0)
+//         .mount("/", routes![events, board])
+//         .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static")))
+// }
 
 fn main_() -> Corridor {
     let mut game = Corridor::new();
@@ -80,4 +81,14 @@ fn main_() -> Corridor {
     println!();
     println!("{:?}", Instant::now());
     game
+}
+
+fn test<const N: usize>(s: [usize; N]) {
+    println!("{:?}", s)
+}
+fn main() {
+    let b = [1, 2, 3];
+    test(b);
+    let c = [1, 2, 3, 4];
+    test(c);
 }
