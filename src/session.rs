@@ -50,7 +50,8 @@ impl CorridorSession {
     }
 }
 
-pub fn corridor_mover(player_move: PlayerMove, session: CorridorSession) -> &'static str {
+pub fn corridor_mover(player_move: PlayerMove, session: &'static mut CorridorSession) -> &'static str {
+    // TODO be ware of lifetimes
     match player_move {
         PlayerMove::CorridorBorderH(val, player) => session.new_border(&player, val, "h"),
         PlayerMove::CorridorBorderV(val, player) => session.new_border(&player, val, "v"),
