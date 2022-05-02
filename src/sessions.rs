@@ -2,6 +2,13 @@ use crate::game_logic::Corridor;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
+pub trait GameSession {
+    type Positon;
+    type Spec;
+    fn new(player_list: &Vec<&str>) -> Self;
+    fn move_player(&mut self, player: &str, new_position: Self::Positon, options: Self::Spec) -> PlayerMoveResult;
+}
+
 pub struct CorridorSession {
     up_player: String,
     down_player: String,
@@ -10,42 +17,23 @@ pub struct CorridorSession {
     current: String,
 }
 
-const OK: &str = "ok";
-const WRONG_PLAYER: &str = "await turn";
-const UNALLOWED: &str = "wrong move";
+pub enum PlayerMoveResult {
+    Ok,
+    WrongPlayer,
+    Unallowed,
+    Unknown,
+}
 
 impl CorridorSession {
-    pub fn new(player_1: &str, player_2: &str) -> CorridorSession {
-        CorridorSession {
-            up_player: player_1.to_owned(),
-            down_player: player_2.to_owned(),
-            game: Corridor::new(),
-            turn: 0,
-            current: player_1.to_owned(),
-        }
-    }
-    pub fn new_border(&mut self, player: &str, position: (usize, usize), border_type: &str) -> &str {
+    pub fn new_border(&mut self, player: &str, position: (usize, usize), border_type: &str) -> PlayerMoveResult {
         if player != self.current {
-            return WRONG_PLAYER;
+            return PlayerMoveResult::WrongPlayer;
         }
         if !self.game.new_border(position, border_type) {
-            return UNALLOWED;
+            return PlayerMoveResult::Unallowed;
         }
         self.switch_players();
-        OK
-    }
-    pub fn move_player(&mut self, new_position: (usize, usize), player: &str) -> &str {
-        if self.current != player {
-            return WRONG_PLAYER;
-        }
-        let player_code = if player == self.up_player { "up" } else { "down" };
-        if !self.game.move_player(new_position, player_code) {
-            return UNALLOWED;
-        }
-        if self.game.up_player != self.game.down_player {
-            self.switch_players();
-        }
-        OK
+        PlayerMoveResult::Ok
     }
 
     fn switch_players(&mut self) {
@@ -57,13 +45,40 @@ impl CorridorSession {
     }
 }
 
-pub fn corridor_mover(player_move: PlayerMove, session: &'static mut CorridorSession) -> &'static str {
+impl GameSession for CorridorSession {
+    type Positon = (usize, usize);
+    type Spec = ();
+    fn new(player_list: &Vec<&str>) -> Self {
+        CorridorSession {
+            up_player: player_list[0].to_owned(),
+            down_player: player_list[1].to_owned(),
+            game: Corridor::new(),
+            turn: 0,
+            current: player_list[0].to_owned(),
+        }
+    }
+    fn move_player(&mut self, player: &str, new_position: Self::Positon, options: Self::Spec) -> PlayerMoveResult {
+        if self.current != player {
+            return PlayerMoveResult::WrongPlayer;
+        }
+        let player_code = if player == self.up_player { "up" } else { "down" };
+        if !self.game.move_player(new_position, player_code) {
+            return PlayerMoveResult::Unallowed;
+        }
+        if self.game.up_player != self.game.down_player {
+            self.switch_players();
+        }
+        PlayerMoveResult::Ok
+    }
+}
+
+pub fn corridor_mover(player_move: PlayerMove, session: &mut CorridorSession) -> PlayerMoveResult {
     // TODO be ware of lifetimes
     match player_move {
         PlayerMove::CorridorBorderH(val, player) => session.new_border(&player, val, "h"),
         PlayerMove::CorridorBorderV(val, player) => session.new_border(&player, val, "v"),
-        PlayerMove::CorridorMove(val, player) => session.move_player(val, &player),
-        _ => "unknown move",
+        PlayerMove::CorridorMove(val, player) => session.move_player(&player, val, ()),
+        _ => PlayerMoveResult::Unknown,
     }
 }
 

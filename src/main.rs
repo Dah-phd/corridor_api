@@ -3,13 +3,13 @@ extern crate rocket;
 use rocket::serde::{Deserialize, Serialize};
 mod game_logic;
 use game_logic::{print_state, Corridor};
-mod session;
-use session::CorridorSession;
+mod sessions;
+use sessions::{CorridorSession, GameSession};
 use std::time::Instant;
 
-fn make_session(game_type: &str, player_ids: &Vec<&str>) -> Option<session::CorridorSession> {
+fn make_session<Session: GameSession>(game_type: &str, player_ids: &Vec<&str>) -> Option<Session> {
     if game_type == "corridor" && player_ids.len() >= 2 {
-        return Some(session::CorridorSession::new(player_ids[0], player_ids[1]));
+        return Some(CorridorSession::new(&player_ids));
     }
     None
 }
