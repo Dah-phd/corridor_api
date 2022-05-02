@@ -25,12 +25,21 @@ pub enum PlayerMoveResult {
 }
 
 impl CorridorSession {
-    pub fn new_border(&mut self, player: &str, position: (usize, usize), border_type: &str) -> PlayerMoveResult {
+    pub fn new_wall(&mut self, player: &str, position: (usize, usize), wall_type: &str) -> PlayerMoveResult {
         if player != self.current {
             return PlayerMoveResult::WrongPlayer;
         }
-        if !self.game.new_border(position, border_type) {
-            return PlayerMoveResult::Unallowed;
+        if player == self.up_player {
+            if 1 > self.game.up_player_free_walls || !self.game.new_wall(position, wall_type) {
+                return PlayerMoveResult::Unallowed;
+            }
+            self.game.up_player_free_walls -= 1
+        }
+        if player == self.down_player {
+            if 1 > self.game.down_player_free_walls || !self.game.new_wall(position, wall_type) {
+                return PlayerMoveResult::Unallowed;
+            }
+            self.game.down_player_free_walls -= 1
         }
         self.switch_players();
         PlayerMoveResult::Ok
@@ -74,8 +83,8 @@ impl GameSession for CorridorSession {
 
 pub fn corridor_mover(player_move: PlayerMove, session: &mut CorridorSession) -> PlayerMoveResult {
     match player_move {
-        PlayerMove::CorridorBorderH(val, player) => session.new_border(&player, val, "h"),
-        PlayerMove::CorridorBorderV(val, player) => session.new_border(&player, val, "v"),
+        PlayerMove::CorridorWallH(val, player) => session.new_wall(&player, val, "h"),
+        PlayerMove::CorridorWallV(val, player) => session.new_wall(&player, val, "v"),
         PlayerMove::CorridorMove(val, player) => session.move_player(&player, val, ()),
         _ => PlayerMoveResult::Unknown,
     }
@@ -83,8 +92,8 @@ pub fn corridor_mover(player_move: PlayerMove, session: &mut CorridorSession) ->
 
 #[derive(Clone)]
 pub enum PlayerMove {
-    CorridorBorderV((usize, usize), String),
-    CorridorBorderH((usize, usize), String),
+    CorridorWallV((usize, usize), String),
+    CorridorWallH((usize, usize), String),
     CorridorMove((usize, usize), String),
 }
 
