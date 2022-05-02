@@ -56,22 +56,11 @@ struct Trigger {
     pub message: String,
 }
 
-// #[launch]
-// fn rocket() -> _ {
-//     let ACTIVE_SESSIONS: Vec<CorridorSession> = Vec::new();
-//     rocket::build()
-//         .manage(rocket::tokio::sync::broadcast::channel::<MoveEvent>(1024).0)
-//         .mount("/", routes![events, make_move])
-//         .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static")))
-// }
-
-fn main() {
-    fn a_() -> bool {
-        println!("runs god damn it!");
-        true
-    }
-
-    if true && a_() {
-        println!("works")
-    }
+#[launch]
+fn rocket() -> _ {
+    let ACTIVE_SESSIONS: Vec<CorridorSession> = Vec::new();
+    rocket::build()
+        .manage(rocket::tokio::sync::broadcast::channel::<MoveEvent>(1024).0)
+        .mount("/", routes![events, make_move])
+        .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static")))
 }
