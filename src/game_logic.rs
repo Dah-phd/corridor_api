@@ -8,8 +8,10 @@ use std::time::Instant;
 pub struct Corridor {
     pub up_player: (usize, usize),
     pub down_player: (usize, usize),
-    pub vertcal_borders: Vec<(usize, usize)>,    // (row, col)
-    pub horizontal_borders: Vec<(usize, usize)>, // (row, col)
+    pub up_player_free_walls: usize,
+    pub down_player_free_walls: usize,
+    pub vertcal_walls: Vec<(usize, usize)>,    // (row, col)
+    pub horizontal_walls: Vec<(usize, usize)>, // (row, col)
     pub winner: Option<bool>,
 }
 
@@ -18,8 +20,10 @@ impl Corridor {
         Corridor {
             up_player: (0, 4),
             down_player: (8, 4),
-            vertcal_borders: Vec::new(),
-            horizontal_borders: Vec::new(),
+            up_player_free_walls: 9,
+            down_player_free_walls: 9,
+            vertcal_walls: Vec::new(),
+            horizontal_walls: Vec::new(),
             winner: None,
         }
     }
@@ -27,7 +31,7 @@ impl Corridor {
     pub fn move_player(&mut self, new_position: (usize, usize), player: &str) -> bool {
         match player {
             "up" => {
-                if self.is_move_blocked_by_border_or_wrong(self.up_player, new_position) {
+                if self.is_move_blocked_by_wall_or_wrong(self.up_player, new_position) {
                     return false;
                 } else {
                     self.up_player = new_position;
@@ -35,7 +39,7 @@ impl Corridor {
                 }
             }
             "down" => {
-                if self.is_move_blocked_by_border_or_wrong(self.down_player, new_position) {
+                if self.is_move_blocked_by_wall_or_wrong(self.down_player, new_position) {
                     return false;
                 } else {
                     self.down_player = new_position;
@@ -46,62 +50,62 @@ impl Corridor {
         }
     }
 
-    pub fn new_border(&mut self, border: (usize, usize), border_type: &str) -> bool {
-        if border.0 > 7 || border.1 > 7 {
+    pub fn new_wall(&mut self, wall: (usize, usize), wall_type: &str) -> bool {
+        if wall.0 > 7 || wall.1 > 7 {
             return false;
         }
-        if !self.border_is_possible(border, border_type) {
+        if !self.wall_is_possible(wall, wall_type) {
             return false;
         }
-        if border_type == "h" {
-            self.horizontal_borders.push(border)
+        if wall_type == "h" {
+            self.horizontal_walls.push(wall)
         } else {
-            self.vertcal_borders.push(border)
+            self.vertcal_walls.push(wall)
         };
         if self.player_can_win(self.up_player, &mut Vec::new(), 8, 0)
             && self.player_can_win(self.down_player, &mut Vec::new(), 0, 0)
         {
             return true;
         }
-        if border_type == "h" {
-            self.horizontal_borders.pop();
+        if wall_type == "h" {
+            self.horizontal_walls.pop();
         } else {
-            self.vertcal_borders.pop();
+            self.vertcal_walls.pop();
         };
         false
     }
 
-    fn border_is_possible(&self, new_border: (usize, usize), border_type: &str) -> bool {
-        match border_type {
+    fn wall_is_possible(&self, new_wall: (usize, usize), wall_type: &str) -> bool {
+        match wall_type {
             "h" => {
-                for border in &self.horizontal_borders {
-                    if *border == new_border {
+                for wall in &self.horizontal_walls {
+                    if *wall == new_wall {
                         return false;
                     }
-                    if border.1 <= 6 && (border.0, border.1 + 1) == new_border {
+                    if wall.1 <= 6 && (wall.0, wall.1 + 1) == new_wall {
                         return false;
                     }
-                    if border.1 >= 1 && (border.0, border.1 - 1) == new_border {
+                    if wall.1 >= 1 && (wall.0, wall.1 - 1) == new_wall {
                         return false;
                     }
                 }
-                if self.vertcal_borders.contains(&new_border) {
+                if self.vertcal_walls.contains(&new_wall) {
                     return false;
                 }
             }
             "v" => {
-                for border in &self.vertcal_borders {
-                    if *border == new_border {
+                for wall in &self.vertcal_walls {
+                    if *wall == new_wall {
                         return false;
                     }
-                    if border.0 <= 6 && (border.0 + 1, border.1) == new_border {
+                    if wall.0 <= 6 && (wall.0 + 1, wall.1) == new_wall {
                         return false;
                     }
-                    if border.0 >= 1 && (border.0 - 1, border.1) == new_border {
+                    if wall.0 >= 1 && (wall.0 - 1, wall.1) == new_wall {
                         return false;
                     }
                 }
-                if self.horizontal_borders.contains(&new_border) {
+                if self.horizontal_walls.contains(&new_wall) {
                     return false;
                 }
             }
@@ -110,7 +114,7 @@ impl Corridor {
         true
     }
 
-    fn is_move_blocked_by_border_or_wrong(&self, start_position: (usize, usize), possible_path: (usize, usize)) -> bool {
+    fn is_move_blocked_by_wall_or_wrong(&self, start_position: (usize, usize), possible_path: (usize, usize)) -> bool {
         if start_position.0 == possible_path.0 {
             let column_move = if possible_path.1 > start_position.1 {
                 (start_position.1, possible_path.1)
@@ -120,11 +124,11 @@ impl Corridor {
             if column_move.1 - column_move.0 != 1 {
                 return true;
             }
-            for border in &self.vertcal_borders {
-                if border.0 == start_position.0 && border.1 == column_move.0 {
+            for wall in &self.vertcal_walls {
+                if wall.0 == start_position.0 && wall.1 == column_move.0 {
                     return true;
                 }
-                if start_position.0 != 0 && border.0 == start_position.0 - 1 && border.1 == column_move.0 {
+                if start_position.0 != 0 && wall.0 == start_position.0 - 1 && wall.1 == column_move.0 {
                     return true;
                 }
             }
@@ -138,11 +142,11 @@ impl Corridor {
             if row_move.1 - row_move.0 != 1 {
                 return true;
             };
-            for border in &self.horizontal_borders {
-                if border.1 == start_position.1 && border.0 == row_move.0 {
+            for wall in &self.horizontal_walls {
+                if wall.1 == start_position.1 && wall.0 == row_move.0 {
                     return true;
                 }
-                if start_position.1 != 0 && border.1 == start_position.1 - 1 && border.0 == row_move.0 {
+                if start_position.1 != 0 && wall.1 == start_position.1 - 1 && wall.0 == row_move.0 {
                     return true;
                 }
             }
@@ -176,7 +180,7 @@ impl Corridor {
             }
             for possible_path in possible_paths {
                 if !past_position.contains(&possible_path)
-                    && !self.is_move_blocked_by_border_or_wrong(start_position, possible_path)
+                    && !self.is_move_blocked_by_wall_or_wrong(start_position, possible_path)
                 {
                     past_position.push(possible_path);
                     if self.player_can_win(possible_path, past_position, target, target_coordinate) {
@@ -199,15 +203,14 @@ pub fn print_state(game: &Corridor) {
             } else {
                 line.push_str("[ ]")
             }
-            if game.vertcal_borders.contains(&(row_id, col_id))
-                || row_id >= 1 && game.vertcal_borders.contains(&(row_id - 1, col_id))
+            if game.vertcal_walls.contains(&(row_id, col_id)) || row_id >= 1 && game.vertcal_walls.contains(&(row_id - 1, col_id))
             {
                 line.push_str("|")
             } else {
                 line.push_str(" ")
             }
-            if game.horizontal_borders.contains(&(row_id, col_id))
-                || col_id >= 1 && game.horizontal_borders.contains(&(row_id, col_id - 1))
+            if game.horizontal_walls.contains(&(row_id, col_id))
+                || col_id >= 1 && game.horizontal_walls.contains(&(row_id, col_id - 1))
             {
                 underline.push_str("----")
             } else {
