@@ -7,6 +7,13 @@ mod session;
 use session::CorridorSession;
 use std::time::Instant;
 
+fn make_session(game_type: &str, player_ids: &Vec<&str>) -> Option<session::CorridorSession> {
+    if game_type == "corridor" && player_ids.len() >= 2 {
+        return Some(session::CorridorSession::new(player_ids[0], player_ids[1]));
+    }
+    None
+}
+
 #[get("/status/update/<session>")]
 async fn get_state(session: i64) {}
 

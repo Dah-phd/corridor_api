@@ -31,11 +31,7 @@ impl CorridorSession {
         if !self.game.new_border(position, border_type) {
             return UNALLOWED;
         }
-        if self.current == self.up_player {
-            self.current = self.down_player.to_owned();
-        } else {
-            self.current = self.up_player.to_owned()
-        }
+        self.switch_players();
         OK
     }
     pub fn move_player(&mut self, new_position: (usize, usize), player: &str) -> &str {
@@ -46,7 +42,18 @@ impl CorridorSession {
         if !self.game.move_player(new_position, player_code) {
             return UNALLOWED;
         }
+        if self.game.up_player != self.game.down_player {
+            self.switch_players();
+        }
         OK
+    }
+
+    fn switch_players(&mut self) {
+        if self.current == self.up_player {
+            self.current = self.down_player.to_owned();
+        } else {
+            self.current = self.up_player.to_owned()
+        }
     }
 }
 
