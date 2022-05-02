@@ -7,11 +7,22 @@ mod sessions;
 use sessions::{CorridorSession, GameSession};
 use std::time::Instant;
 
-fn make_session<Session: GameSession>(game_type: &str, player_ids: &Vec<&str>) -> Option<Session> {
-    if game_type == "corridor" && player_ids.len() >= 2 {
-        return Some(CorridorSession::new(&player_ids));
+#[derive(Debug, Serialize, Deserialize, Clone, FromForm)]
+#[cfg_attr(test, derive(PartialEq, UriDisplayQuery))]
+#[serde(crate = "rocket::serde")]
+pub struct MoveEvent {
+    msg: String,
+}
+
+impl MoveEvent {
+    pub fn update() -> Self {
+        MoveEvent { msg: "upd".to_owned() }
     }
-    None
+}
+
+#[get("/move")]
+fn make_move(queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<MoveEvent>>) {
+    let _res = queue.send(MoveEvent::update());
 }
 
 #[get("/status/update/<session>")]
@@ -19,7 +30,7 @@ async fn get_state(session: i64) {}
 
 #[get("/events")]
 async fn events(
-    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Corridor>>,
+    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<MoveEvent>>,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
     let mut rx = queue.subscribe();
@@ -39,15 +50,6 @@ async fn events(
     }
 }
 
-#[get("/test")]
-fn board() -> String {
-    let mut new_game = Corridor::new();
-    let result = match rocket::serde::json::serde_json::to_string(&new_game) {
-        Ok(v) => return v,
-        _ => return "error".to_owned(),
-    };
-}
-
 #[derive(Debug, Clone, FromForm, Serialize, Deserialize)]
 #[cfg_attr(test, derive(PartialEq, UriDisplayQuery))]
 #[serde(crate = "rocket::serde")]
@@ -55,47 +57,11 @@ struct Trigger {
     pub message: String,
 }
 
-// #[launch]
-// fn rocket() -> _ {
-//     main__();
-//     let ACTIVE_SESSIONS: Vec<CorridorSession> = Vec::new();
-//     rocket::build()
-//         .manage(rocket::tokio::sync::broadcast::channel::<Corridor>(1024).0)
-//         .mount("/", routes![events, board])
-//         .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static")))
-// }
-
-fn main_() -> Corridor {
-    let mut game = Corridor::new();
-    print_state(&game);
-    println!();
-    println!("{}", game.new_border((1, 1), "h"));
-    println!("{}", game.new_border((1, 0), "v"));
-    println!("{}", game.new_border((2, 4), "v"));
-
-    println!("{}", game.new_border((1, 3), "h"));
-    println!("{}", game.new_border((3, 5), "h"));
-    println!("{}", game.new_border((1, 7), "h"));
-
-    println!("{}", game.new_border((2, 6), "v"));
-
-    println!("{}", game.new_border((0, 0), "h"));
-
-    print_state(&game);
-    println!();
-    println!("{}", game.move_player((7, 4), "down"));
-    print_state(&game);
-    println!();
-    println!("{:?}", Instant::now());
-    game
-}
-
-fn test<const N: usize>(s: [usize; N]) {
-    println!("{:?}", s)
-}
-fn main() {
-    let b = [1, 2, 3];
-    test(b);
-    let c = [1, 2, 3, 4];
-    test(c);
+#[launch]
+fn rocket() -> _ {
+    let ACTIVE_SESSIONS: Vec<CorridorSession> = Vec::new();
+    rocket::build()
+        .manage(rocket::tokio::sync::broadcast::channel::<MoveEvent>(1024).0)
+        .mount("/", routes![events, make_move])
+        .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static")))
 }
