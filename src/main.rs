@@ -1,30 +1,10 @@
 #[macro_use]
 extern crate rocket;
 use rocket::serde::{Deserialize, Serialize};
-mod game_logic;
-use game_logic::{print_state, Quoridor};
-mod sessions;
-use sessions::{GameSession, QuoridorSession};
-use std::sync::Mutex;
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(crate = "rocket::serde")]
-pub enum Session {
-    ActiveQuoridor(QuoridorSession),
-}
-
-impl Session {
-    fn get_id(&self) -> i32 {
-        match self {
-            Session::ActiveQuoridor(v) => v.get_id(),
-            _ => panic!("insert get_id for new Session!"),
-        }
-    }
-}
-
-struct ActiveSessions {
-    sessions: Mutex<Vec<Session>>,
-}
+mod abstarctions;
+use abstarctions::{ActiveSessions, GameSession, Session, SessionType};
+mod quoridor;
+use quoridor::{print_state, QuoridorSession};
 
 #[get("/quor/move")]
 fn make_move(queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Session>>) {
@@ -72,7 +52,5 @@ fn rocket() -> _ {
         .mount("/", routes![events, make_move])
         .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static")))
         .manage(rocket::tokio::sync::broadcast::channel::<Session>(1024).0)
-        .manage(ActiveSessions {
-            sessions: Mutex::new(Vec::new()),
-        })
+        .manage(ActiveSessions::new())
 }
