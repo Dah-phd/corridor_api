@@ -1,11 +1,10 @@
 extern crate rocket;
 use rocket::fs::{relative, FileServer};
 use rocket::serde::{Deserialize, Serialize};
-use std::time::Instant;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
-pub struct Corridor {
+pub struct Quoridor {
     pub up_player: (usize, usize),
     pub down_player: (usize, usize),
     pub up_player_free_walls: usize,
@@ -15,9 +14,9 @@ pub struct Corridor {
     pub winner: Option<bool>,
 }
 
-impl Corridor {
-    pub fn new() -> Corridor {
-        Corridor {
+impl Quoridor {
+    pub fn new() -> Self {
+        Self {
             up_player: (0, 4),
             down_player: (8, 4),
             up_player_free_walls: 9,
@@ -193,7 +192,7 @@ impl Corridor {
     }
 }
 
-pub fn print_state(game: &Corridor) {
+pub fn print_state(game: &Quoridor) {
     for row_id in 0..9 {
         let mut line = String::new();
         let mut underline = String::new();

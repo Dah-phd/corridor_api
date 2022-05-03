@@ -42,9 +42,17 @@ function setConnectedStatus(status) {
 }
 
 
-subscribe('/events')
+// subscribe('/events/')
 
-
-class Corridor {
-    constructor() { }
-}
+window.addEventListener(
+    "load", (_) => {
+        let btn = document.getElementById('sub')
+        console.log(btn)
+        btn.addEventListener(
+            "click", (_) => {
+                let room = document.getElementById('room').value
+                subscribe("events/" + room)
+            }
+        )
+    }
+)

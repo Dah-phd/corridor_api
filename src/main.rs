@@ -2,34 +2,22 @@
 extern crate rocket;
 use rocket::serde::{Deserialize, Serialize};
 mod game_logic;
-use game_logic::{print_state, Corridor};
+use game_logic::{print_state, Quoridor};
 mod sessions;
-use sessions::{CorridorSession, GameSession};
+use sessions::{GameSession, QuoridorSession};
 
-#[derive(Debug, Serialize, Deserialize, Clone, FromForm)]
-#[cfg_attr(test, derive(PartialEq, UriDisplayQuery))]
-#[serde(crate = "rocket::serde")]
-pub struct MoveEvent {
-    msg: String,
+#[get("/quor/move")]
+fn make_move(queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<QuoridorSession>>) {
+    let _res = queue.send(QuoridorSession::new(&vec!["dah", "pesho"], 32));
 }
 
-impl MoveEvent {
-    pub fn update() -> Self {
-        MoveEvent { msg: "upd".to_owned() }
-    }
-}
+#[get("/state")]
+fn get_state(active_sessions: Vec<QuoridorSession>) {}
 
-#[get("/move")]
-fn make_move(queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<MoveEvent>>) {
-    let _res = queue.send(MoveEvent::update());
-}
-
-#[get("/status/update/<session>")]
-async fn get_state(session: i64) {}
-
-#[get("/events")]
+#[get("/quor/events/<session>")]
 async fn events(
-    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<MoveEvent>>,
+    session: i32,
+    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<QuoridorSession>>,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
     let mut rx = queue.subscribe();
@@ -37,7 +25,7 @@ async fn events(
         loop {
             let msg = rocket::tokio::select! {
                 msg = rx.recv() => match msg {
-                    Ok(msg) => msg,
+                    Ok(msg) => if msg.id == session {msg} else {continue},
                     Err(rocket::tokio::sync::broadcast::error::RecvError::Closed) => break,
                     Err(rocket::tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                 },
@@ -49,18 +37,12 @@ async fn events(
     }
 }
 
-#[derive(Debug, Clone, FromForm, Serialize, Deserialize)]
-#[cfg_attr(test, derive(PartialEq, UriDisplayQuery))]
-#[serde(crate = "rocket::serde")]
-struct Trigger {
-    pub message: String,
-}
-
 #[launch]
 fn rocket() -> _ {
-    let ACTIVE_SESSIONS: Vec<CorridorSession> = Vec::new();
+    let active_sessions: Vec<QuoridorSession> = Vec::new();
     rocket::build()
-        .manage(rocket::tokio::sync::broadcast::channel::<MoveEvent>(1024).0)
-        .mount("/", routes![events, make_move])
+        .manage(active_sessions)
+        .manage(rocket::tokio::sync::broadcast::channel::<QuoridorSession>(1024).0)
+        .mount("/", routes![events, make_move, get_state])
         .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static")))
 }

@@ -1,18 +1,25 @@
-use crate::game_logic::Corridor;
+use crate::game_logic::Quoridor;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+extern crate rocket;
+use rocket::fs::{relative, FileServer};
+use rocket::serde::{Deserialize, Serialize};
 
 pub trait GameSession {
     type Positon;
     type Spec;
-    fn new(player_list: &Vec<&str>) -> Self;
+    fn new(player_list: &Vec<&str>, id: i32) -> Self;
     fn move_player(&mut self, player: &str, new_position: Self::Positon, options: Self::Spec) -> PlayerMoveResult;
+    fn get_id(&self) -> i32;
 }
 
-pub struct CorridorSession {
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(crate = "rocket::serde")]
+pub struct QuoridorSession {
+    pub id: i32,
     up_player: String,
     down_player: String,
-    game: Corridor,
+    game: Quoridor,
     turn: usize,
     current: String,
 }
@@ -24,7 +31,7 @@ pub enum PlayerMoveResult {
     Unknown,
 }
 
-impl CorridorSession {
+impl QuoridorSession {
     pub fn new_wall(&mut self, player: &str, position: (usize, usize), wall_type: &str) -> PlayerMoveResult {
         if player != self.current {
             return PlayerMoveResult::WrongPlayer;
@@ -54,14 +61,15 @@ impl CorridorSession {
     }
 }
 
-impl GameSession for CorridorSession {
+impl GameSession for QuoridorSession {
     type Positon = (usize, usize);
     type Spec = ();
-    fn new(player_list: &Vec<&str>) -> Self {
-        CorridorSession {
+    fn new(player_list: &Vec<&str>, id: i32) -> Self {
+        QuoridorSession {
             up_player: player_list[0].to_owned(),
             down_player: player_list[1].to_owned(),
-            game: Corridor::new(),
+            id,
+            game: Quoridor::new(),
             turn: 0,
             current: player_list[0].to_owned(),
         }
@@ -79,22 +87,26 @@ impl GameSession for CorridorSession {
         }
         PlayerMoveResult::Ok
     }
+
+    fn get_id(&self) -> i32 {
+        self.id
+    }
 }
 
-pub fn corridor_mover(player_move: PlayerMove, session: &mut CorridorSession) -> PlayerMoveResult {
+pub fn quoridor_mover(player_move: PlayerMove, session: &mut QuoridorSession) -> PlayerMoveResult {
     match player_move {
-        PlayerMove::CorridorWallH(val, player) => session.new_wall(&player, val, "h"),
-        PlayerMove::CorridorWallV(val, player) => session.new_wall(&player, val, "v"),
-        PlayerMove::CorridorMove(val, player) => session.move_player(&player, val, ()),
+        PlayerMove::QuoridorWallH(val, player) => session.new_wall(&player, val, "h"),
+        PlayerMove::QuoridorWallV(val, player) => session.new_wall(&player, val, "v"),
+        PlayerMove::QuoridorMove(val, player) => session.move_player(&player, val, ()),
         _ => PlayerMoveResult::Unknown,
     }
 }
 
 #[derive(Clone)]
 pub enum PlayerMove {
-    CorridorWallV((usize, usize), String),
-    CorridorWallH((usize, usize), String),
-    CorridorMove((usize, usize), String),
+    QuoridorWallV((usize, usize), String),
+    QuoridorWallH((usize, usize), String),
+    QuoridorMove((usize, usize), String),
 }
 
 pub struct EventListener {
