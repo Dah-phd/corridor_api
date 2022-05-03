@@ -51,7 +51,7 @@ window.addEventListener(
         btn.addEventListener(
             "click", (_) => {
                 let room = document.getElementById('room').value
-                subscribe("events/" + room)
+                subscribe("quor/events/" + room)
             }
         )
     }

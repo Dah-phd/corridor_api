@@ -6,10 +6,10 @@ use rocket::fs::{relative, FileServer};
 use rocket::serde::{Deserialize, Serialize};
 
 pub trait GameSession {
-    type Positon;
+    type Position;
     type Spec;
     fn new(player_list: &Vec<&str>, id: i32) -> Self;
-    fn move_player(&mut self, player: &str, new_position: Self::Positon, options: Self::Spec) -> PlayerMoveResult;
+    fn move_player(&mut self, player: &str, new_position: Self::Position, options: Self::Spec) -> PlayerMoveResult;
     fn get_id(&self) -> i32;
 }
 
@@ -62,7 +62,7 @@ impl QuoridorSession {
 }
 
 impl GameSession for QuoridorSession {
-    type Positon = (usize, usize);
+    type Position = (usize, usize);
     type Spec = ();
     fn new(player_list: &Vec<&str>, id: i32) -> Self {
         QuoridorSession {
@@ -74,7 +74,7 @@ impl GameSession for QuoridorSession {
             current: player_list[0].to_owned(),
         }
     }
-    fn move_player(&mut self, player: &str, new_position: Self::Positon, options: Self::Spec) -> PlayerMoveResult {
+    fn move_player(&mut self, player: &str, new_position: Self::Position, options: Self::Spec) -> PlayerMoveResult {
         if self.current != player {
             return PlayerMoveResult::WrongPlayer;
         }
