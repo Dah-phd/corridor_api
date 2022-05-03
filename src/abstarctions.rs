@@ -27,6 +27,8 @@ pub enum PlayerMoveResult {
     Unknown,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(crate = "rocket::serde")]
 pub enum SessionType {
     Quoridor,
 }
@@ -49,6 +51,62 @@ impl Session {
             Session::ActiveQuoridor(v) => v.get_id(),
             _ => panic!("insert get_id for new Session!"),
         }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(crate = "rocket::serde")]
+pub struct Room {
+    pub owner: String,
+    pub session_type: SessionType,
+}
+
+pub struct SessionRooms {
+    pub rooms: Mutex<Vec<Room>>,
+}
+
+impl SessionRooms {
+    pub fn new() -> Self {
+        Self {
+            rooms: Mutex::new(Vec::new()),
+        }
+    }
+
+    pub fn new_room(&self, player_name: &str, session_type: SessionType) -> bool {
+        let mut room_list = self.rooms.lock().unwrap();
+        let exposed_vector = &mut *room_list;
+        for room in exposed_vector.iter() {
+            if room.owner == player_name {
+                return false;
+            }
+        }
+        exposed_vector.push(Room {
+            owner: player_name.to_owned(),
+            session_type,
+        });
+        true
+    }
+
+    pub fn get_by_owner(&self, player_name: &str) -> Option<Room> {
+        let mut room_list = self.rooms.lock().unwrap();
+        let exposed_vector = &mut *room_list;
+        for room in exposed_vector {
+            if room.owner == player_name {
+                return Some(room.clone());
+            }
+        }
+        None
+    }
+    pub fn drop(&self, player_name: &str) -> bool {
+        let mut room_list = self.rooms.lock().unwrap();
+        let exposed_vector = &mut *room_list;
+        for (i, room) in exposed_vector.iter().enumerate() {
+            if room.owner == player_name {
+                exposed_vector.remove(i);
+                return true;
+            }
+        }
+        false
     }
 }
 
@@ -79,7 +137,7 @@ impl ActiveSessions {
         }
     }
 
-    fn get_sesion(&self, id: i32) -> Option<Session> {
+    pub fn get_session(&self, id: i32) -> Option<Session> {
         let mut sessions_list = self.sessions.lock().unwrap();
         let exposed_vector = &mut *sessions_list;
         for session in exposed_vector {
