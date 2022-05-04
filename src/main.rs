@@ -2,29 +2,111 @@
 extern crate rocket;
 use rocket::serde::{Deserialize, Serialize};
 mod abstarctions;
-use abstarctions::{ActiveSessions, GameSession, Room, Session, SessionRooms, SessionType};
+use abstarctions::{ActiveSessions, ChatID, GameSession, Messages, Room, Session, SessionRooms, SessionType};
 mod quoridor;
 use quoridor::{print_state, QuoridorSession};
 
 #[get("/move")]
 fn make_move(queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Session>>) {
-    let _res = queue.send(Session::ActiveQuoridor(QuoridorSession::new(&vec!["dah", "pesho"], 32)));
+    let _res = queue.send(Session::ActiveQuoridor(QuoridorSession::new(
+        &vec!["dah".to_owned(), "pesho".to_owned()],
+        32,
+    )));
 }
 
 #[get("/state/<session>")]
-fn get_state(session: i32, active_sessions: &rocket::State<ActiveSessions>) {
+fn get_state(session: i32, active_sessions: &rocket::State<ActiveSessions>) -> rocket::serde::json::Json<Session> {
     let session_state = active_sessions.get_session(session);
+    match session_state {
+        None => rocket::serde::json::Json(Session::NotFound),
+        Some(active_session) => rocket::serde::json::Json(active_session),
+    }
+}
+
+// init room
+
+#[derive(Deserialize)]
+#[serde(crate = "rocket::serde")]
+struct RoomBase {
+    owner: String,
+    game: SessionType,
+}
+
+#[post("/create_room", data = "<room>")]
+fn make_room(room: rocket::serde::json::Json<RoomBase>, rooms: &rocket::State<SessionRooms>) -> rocket::serde::json::Json<bool> {
+    rocket::serde::json::Json(rooms.new_room(&room.owner, room.game))
+}
+
+#[post("/join/<owner>")]
+fn join_room(owner: String) {}
+
+// init new game from room
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct RoomToSession(Option<i32>);
+
+#[get("/start_game/<owner>")]
+fn room_to_session(
+    owner: String,
+    rooms: &rocket::State<SessionRooms>,
+    room_queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Messages>>,
+    sessions: &rocket::State<ActiveSessions>,
+) -> rocket::serde::json::Json<RoomToSession> {
+    let maybe_room = rooms.get_by_owner(&owner);
+    match maybe_room {
+        Some(room) => {
+            let new_session = sessions.append(&room.player_list, room.session_type);
+            match new_session {
+                Ok(session_id) => rocket::serde::json::Json(RoomToSession(Some(session_id))),
+                Err(_) => rocket::serde::json::Json(RoomToSession(None)),
+            }
+        }
+        None => rocket::serde::json::Json(RoomToSession(None)),
+    }
 }
 
 #[get("/opened_rooms")]
-fn get_all_rooms() {
-    todo!()
+fn get_all_rooms(rooms: &rocket::State<SessionRooms>) -> rocket::serde::json::Json<Vec<Room>> {
+    rocket::serde::json::Json(rooms.get_all())
+}
+
+#[post("/chat/sender", data = "<msg>")]
+fn post_message(
+    msg: rocket::serde::json::Json<Messages>,
+    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Messages>>,
+) {
+    queue.send(msg.into_inner());
+}
+
+#[get("/chat/<room_owner>")]
+async fn room_chat(
+    room_owner: String,
+    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Messages>>,
+    mut end: rocket::Shutdown,
+) -> rocket::response::stream::EventStream![] {
+    let mut rx = queue.subscribe();
+    rocket::response::stream::EventStream! {
+        loop {
+            let msg = rocket::tokio::select! {
+                msg = rx.recv() => match msg {
+                    Ok(msg) => if msg.id == ChatID::RoomID(room_owner.to_owned()) {msg} else {continue},
+                    Err(rocket::tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    Err(rocket::tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                },
+                _ = &mut end => break,
+            };
+
+            yield rocket::response::stream::Event::json(&msg);
+        }
+    }
 }
 
 #[get("/room_events/<owner>")]
 async fn room_events(
     owner: String,
     queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Room>>,
+    active_rooms: &rocket::State<SessionRooms>,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
     let mut rx = queue.subscribe();
@@ -41,6 +123,7 @@ async fn room_events(
 
             yield rocket::response::stream::Event::json(&msg);
         }
+        // active_rooms.drop(&owner);
     }
 }
 
@@ -48,6 +131,7 @@ async fn room_events(
 async fn events(
     session: i32,
     queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Session>>,
+    active_sessions: &rocket::State<ActiveSessions>,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
     let mut rx = queue.subscribe();
@@ -64,6 +148,30 @@ async fn events(
 
             yield rocket::response::stream::Event::json(&msg);
         }
+        // active_sessions.drop(session);
+    }
+}
+
+#[get("/chat/<session>")]
+async fn session_chat(
+    session: i32,
+    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Messages>>,
+    mut end: rocket::Shutdown,
+) -> rocket::response::stream::EventStream![] {
+    let mut rx = queue.subscribe();
+    rocket::response::stream::EventStream! {
+        loop {
+            let msg = rocket::tokio::select! {
+                msg = rx.recv() => match msg {
+                    Ok(msg) => if msg.id == ChatID::SessionID(session) {msg} else {continue},
+                    Err(rocket::tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    Err(rocket::tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                },
+                _ = &mut end => break,
+            };
+
+            yield rocket::response::stream::Event::json(&msg);
+        }
     }
 }
 
@@ -71,7 +179,8 @@ async fn events(
 fn rocket() -> _ {
     rocket::build()
         .mount("/", routes![events, make_move])
-        .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static")))
+        .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static/build")))
+        .manage(rocket::tokio::sync::broadcast::channel::<Messages>(1024).0)
         .manage(rocket::tokio::sync::broadcast::channel::<Session>(1024).0)
         .manage(ActiveSessions::new())
         .manage(rocket::tokio::sync::broadcast::channel::<Room>(1024).0)

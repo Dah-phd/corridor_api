@@ -8,9 +8,24 @@ use crate::quoridor::QuoridorSession;
 pub trait GameSession {
     type Position;
     type Spec;
-    fn new(player_list: &Vec<&str>, id: i32) -> Self;
+    fn new(player_list: &Vec<String>, id: i32) -> Self;
     fn move_player(&mut self, player: &str, new_position: Self::Position, options: Self::Spec) -> PlayerMoveResult;
     fn get_id(&self) -> i32;
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(crate = "rocket::serde")]
+pub enum ChatID {
+    RoomID(String),
+    SessionID(i32),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(crate = "rocket::serde")]
+pub struct Messages {
+    pub id: ChatID,
+    pub player: String,
+    pub msg: String,
 }
 
 #[derive(Clone)]
@@ -27,7 +42,7 @@ pub enum PlayerMoveResult {
     Unknown,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[serde(crate = "rocket::serde")]
 pub enum SessionType {
     Quoridor,
@@ -37,10 +52,11 @@ pub enum SessionType {
 #[serde(crate = "rocket::serde")]
 pub enum Session {
     ActiveQuoridor(QuoridorSession),
+    NotFound,
 }
 
 impl Session {
-    fn new(player_list: &Vec<&str>, free_id: i32, session_type: SessionType) -> Option<Self> {
+    fn new(player_list: &Vec<String>, free_id: i32, session_type: SessionType) -> Option<Self> {
         match session_type {
             SessionType::Quoridor => Some(Self::ActiveQuoridor(QuoridorSession::new(player_list, free_id))),
             _ => None,
@@ -59,6 +75,8 @@ impl Session {
 pub struct Room {
     pub owner: String,
     pub session_type: SessionType,
+    pub player_list: Vec<String>,
+    pub game_id: Option<i32>,
 }
 
 pub struct SessionRooms {
@@ -72,6 +90,10 @@ impl SessionRooms {
         }
     }
 
+    pub fn get_all(&self) -> Vec<Room> {
+        return self.rooms.lock().unwrap().clone().to_vec();
+    }
+
     pub fn new_room(&self, player_name: &str, session_type: SessionType) -> bool {
         let mut room_list = self.rooms.lock().unwrap();
         let exposed_vector = &mut *room_list;
@@ -83,6 +105,8 @@ impl SessionRooms {
         exposed_vector.push(Room {
             owner: player_name.to_owned(),
             session_type,
+            player_list: vec![player_name.to_owned()],
+            game_id: None,
         });
         true
     }
@@ -120,7 +144,7 @@ impl ActiveSessions {
             sessions: Mutex::new(Vec::new()),
         }
     }
-    fn append(&self, player_list: &Vec<&str>, session_type: SessionType) -> Result<i32, &str> {
+    pub fn append(&self, player_list: &Vec<String>, session_type: SessionType) -> Result<i32, &str> {
         let mut sessions_list = self.sessions.lock().unwrap();
         let exposed_vector = &mut *sessions_list;
         let mut id = 0;
@@ -146,6 +170,17 @@ impl ActiveSessions {
             }
         }
         None
+    }
+
+    pub fn drop(&self, id: i32) {
+        let mut sessions_list = self.sessions.lock().unwrap();
+        let exposed_vector = &mut *sessions_list;
+        for (i, session) in exposed_vector.iter().enumerate() {
+            if session.get_id() == id {
+                exposed_vector.remove(i);
+                return;
+            }
+        }
     }
 
     fn is_id_taken(exposed_vector: &Vec<Session>, id: i32) -> bool {

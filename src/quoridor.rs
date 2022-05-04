@@ -237,7 +237,7 @@ impl QuoridorSession {
 impl GameSession for QuoridorSession {
     type Position = (usize, usize);
     type Spec = ();
-    fn new(player_list: &Vec<&str>, id: i32) -> Self {
+    fn new(player_list: &Vec<String>, id: i32) -> Self {
         QuoridorSession {
             up_player: player_list[0].to_owned(),
             down_player: player_list[1].to_owned(),
