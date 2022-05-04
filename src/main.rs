@@ -50,19 +50,22 @@ struct RoomToSession(Option<i32>);
 fn room_to_session(
     owner: String,
     rooms: &rocket::State<SessionRooms>,
-    room_queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Messages>>,
+    room_queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Room>>,
     sessions: &rocket::State<ActiveSessions>,
-) -> rocket::serde::json::Json<RoomToSession> {
+) {
     let maybe_room = rooms.get_by_owner(&owner);
     match maybe_room {
-        Some(room) => {
+        Some(mut room) => {
             let new_session = sessions.append(&room.player_list, room.session_type);
             match new_session {
-                Ok(session_id) => rocket::serde::json::Json(RoomToSession(Some(session_id))),
-                Err(_) => rocket::serde::json::Json(RoomToSession(None)),
+                Ok(id) => {
+                    room.game_id = Some(id);
+                    let _res = room_queue.send(room);
+                }
+                Err(_) => (),
             }
         }
-        None => rocket::serde::json::Json(RoomToSession(None)),
+        None => (),
     }
 }
 
