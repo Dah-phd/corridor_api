@@ -264,6 +264,15 @@ impl GameSession for QuoridorSession {
     fn get_id(&self) -> i32 {
         self.id
     }
+
+    fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult {
+        match player_move {
+            PlayerMove::QuoridorWallH(val, player) => self.new_wall(&player, val, "h"),
+            PlayerMove::QuoridorWallV(val, player) => self.new_wall(&player, val, "v"),
+            PlayerMove::QuoridorMove(val, player) => self.move_player(&player, val, ()),
+            _ => PlayerMoveResult::Unknown,
+        }
+    }
 }
 
 // used for testing

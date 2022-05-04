@@ -11,6 +11,7 @@ pub trait GameSession {
     fn new(player_list: &Vec<String>, id: i32) -> Self;
     fn move_player(&mut self, player: &str, new_position: Self::Position, options: Self::Spec) -> PlayerMoveResult;
     fn get_id(&self) -> i32;
+    fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -28,11 +29,13 @@ pub struct Messages {
     pub msg: String,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(crate = "rocket::serde")]
 pub enum PlayerMove {
     QuoridorWallV((usize, usize), String),
     QuoridorWallH((usize, usize), String),
     QuoridorMove((usize, usize), String),
+    ChessMove((usize, usize), (usize, usize)), // ((from)=>(to))
 }
 
 pub enum PlayerMoveResult {
@@ -66,6 +69,12 @@ impl Session {
         match self {
             Session::ActiveQuoridor(v) => v.get_id(),
             _ => panic!("insert get_id for new Session!"),
+        }
+    }
+    pub fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult {
+        match self {
+            Session::ActiveQuoridor(v) => v.make_move(player_move),
+            _ => PlayerMoveResult::Unknown,
         }
     }
 }
@@ -121,6 +130,19 @@ impl SessionRooms {
         }
         None
     }
+
+    pub fn add_player(&self, owner: String, player: String) -> bool {
+        let mut room_list = self.rooms.lock().unwrap();
+        let exposed_vector = &mut *room_list;
+        for room in exposed_vector {
+            if room.owner == owner {
+                room.player_list.push(player);
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn drop(&self, player_name: &str) -> bool {
         let mut room_list = self.rooms.lock().unwrap();
         let exposed_vector = &mut *room_list;
@@ -183,6 +205,17 @@ impl ActiveSessions {
         }
     }
 
+    pub fn make_move(&self, id: i32, player_move: PlayerMove) -> Option<PlayerMoveResult> {
+        let mut sessions_list = self.sessions.lock().unwrap();
+        let exposed_vector = &mut *sessions_list;
+        for session in exposed_vector {
+            if session.get_id() == id {
+                return Some(session.make_move(player_move));
+            }
+        }
+        None
+    }
+
     fn is_id_taken(exposed_vector: &Vec<Session>, id: i32) -> bool {
         for session in exposed_vector {
             if session.get_id() == id {
@@ -190,15 +223,6 @@ impl ActiveSessions {
             }
         }
         false
-    }
-}
-
-pub fn quoridor_mover(player_move: PlayerMove, session: &mut QuoridorSession) -> PlayerMoveResult {
-    match player_move {
-        PlayerMove::QuoridorWallH(val, player) => session.new_wall(&player, val, "h"),
-        PlayerMove::QuoridorWallV(val, player) => session.new_wall(&player, val, "v"),
-        PlayerMove::QuoridorMove(val, player) => session.move_player(&player, val, ()),
-        _ => PlayerMoveResult::Unknown,
     }
 }
 

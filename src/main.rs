@@ -2,16 +2,17 @@
 extern crate rocket;
 use rocket::serde::{Deserialize, Serialize};
 mod abstarctions;
-use abstarctions::{ActiveSessions, ChatID, GameSession, Messages, Room, Session, SessionRooms, SessionType};
+use abstarctions::{ActiveSessions, ChatID, Messages, PlayerMove, Room, Session, SessionRooms, SessionType};
 mod quoridor;
 use quoridor::{print_state, QuoridorSession};
 
-#[get("/move")]
-fn make_move(queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Session>>) {
-    let _res = queue.send(Session::ActiveQuoridor(QuoridorSession::new(
-        &vec!["dah".to_owned(), "pesho".to_owned()],
-        32,
-    )));
+#[post("/move/<session>", data = "<player_move>")]
+fn make_move(
+    session: i32,
+    player_move: rocket::serde::json::Json<PlayerMove>,
+    sessions: &rocket::State<ActiveSessions>,
+    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Session>>,
+) {
 }
 
 #[get("/state/<session>")]
@@ -37,8 +38,22 @@ fn make_room(room: rocket::serde::json::Json<RoomBase>, rooms: &rocket::State<Se
     rocket::serde::json::Json(rooms.new_room(&room.owner, room.game))
 }
 
-#[post("/join/<owner>")]
-fn join_room(owner: String) {}
+#[get("/join/<owner>/<player>")]
+fn join_room(
+    owner: String,
+    player: String,
+    rooms: &rocket::State<SessionRooms>,
+    room_queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Room>>,
+) {
+    if rooms.add_player(owner.to_owned(), player) {
+        match rooms.get_by_owner(&owner) {
+            Some(room) => {
+                let _res = room_queue.send(room);
+            }
+            _ => (),
+        };
+    }
+}
 
 // init new game from room
 
