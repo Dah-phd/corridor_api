@@ -6,7 +6,7 @@ use abstarctions::{ActiveSessions, GameSession, Room, Session, SessionRooms, Ses
 mod quoridor;
 use quoridor::{print_state, QuoridorSession};
 
-#[get("/quor/move")]
+#[get("/move")]
 fn make_move(queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Session>>) {
     let _res = queue.send(Session::ActiveQuoridor(QuoridorSession::new(&vec!["dah", "pesho"], 32)));
 }
@@ -14,12 +14,6 @@ fn make_move(queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Sessio
 #[get("/state/<session>")]
 fn get_state(session: i32, active_sessions: &rocket::State<ActiveSessions>) {
     let session_state = active_sessions.get_session(session);
-}
-
-#[get("/state")]
-fn create_session(active_sessions: &rocket::State<ActiveSessions>) {
-    let mut sessions_list = active_sessions.sessions.lock().unwrap();
-    let protected_val = &mut *sessions_list;
 }
 
 #[get("/opened_rooms")]
@@ -50,7 +44,7 @@ async fn room_events(
     }
 }
 
-#[get("/quor/events/<session>")]
+#[get("/events/<session>")]
 async fn events(
     session: i32,
     queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Session>>,
