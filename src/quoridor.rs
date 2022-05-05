@@ -50,66 +50,72 @@ impl Quoridor {
         }
     }
 
-    pub fn new_wall(&mut self, wall: (usize, usize), wall_type: &str) -> bool {
+    pub fn new_h_wall(&mut self, wall: (usize, usize)) -> bool {
         if wall.0 > 7 || wall.1 > 7 {
             return false;
         }
-        if !self.wall_is_possible(wall, wall_type) {
+        if !self.wall_h_is_possible(wall) {
             return false;
         }
-        if wall_type == "h" {
-            self.horizontal_walls.push(wall)
-        } else {
-            self.vertcal_walls.push(wall)
-        };
+        self.horizontal_walls.push(wall);
         if self.player_can_win(self.up_player, &mut Vec::new(), 8, 0)
             && self.player_can_win(self.down_player, &mut Vec::new(), 0, 0)
         {
             return true;
         }
-        if wall_type == "h" {
-            self.horizontal_walls.pop();
-        } else {
-            self.vertcal_walls.pop();
-        };
+        self.horizontal_walls.pop();
         false
     }
 
-    fn wall_is_possible(&self, new_wall: (usize, usize), wall_type: &str) -> bool {
-        match wall_type {
-            "h" => {
-                for wall in &self.horizontal_walls {
-                    if *wall == new_wall {
-                        return false;
-                    }
-                    if wall.1 <= 6 && (wall.0, wall.1 + 1) == new_wall {
-                        return false;
-                    }
-                    if wall.1 >= 1 && (wall.0, wall.1 - 1) == new_wall {
-                        return false;
-                    }
-                }
-                if self.vertcal_walls.contains(&new_wall) {
-                    return false;
-                }
+    fn wall_h_is_possible(&self, new_wall: (usize, usize)) -> bool {
+        for wall in &self.horizontal_walls {
+            if *wall == new_wall {
+                return false;
             }
-            "v" => {
-                for wall in &self.vertcal_walls {
-                    if *wall == new_wall {
-                        return false;
-                    }
-                    if wall.0 <= 6 && (wall.0 + 1, wall.1) == new_wall {
-                        return false;
-                    }
-                    if wall.0 >= 1 && (wall.0 - 1, wall.1) == new_wall {
-                        return false;
-                    }
-                }
-                if self.horizontal_walls.contains(&new_wall) {
-                    return false;
-                }
+            if wall.1 <= 6 && (wall.0, wall.1 + 1) == new_wall {
+                return false;
             }
-            _ => return false,
+            if wall.1 >= 1 && (wall.0, wall.1 - 1) == new_wall {
+                return false;
+            }
+        }
+        if self.vertcal_walls.contains(&new_wall) {
+            return false;
+        }
+        true
+    }
+
+    pub fn new_v_wall(&mut self, wall: (usize, usize)) -> bool {
+        if wall.0 > 7 || wall.1 > 7 {
+            return false;
+        }
+        if !self.wall_v_is_possible(wall) {
+            return false;
+        }
+        self.vertcal_walls.push(wall);
+        if self.player_can_win(self.up_player, &mut Vec::new(), 8, 0)
+            && self.player_can_win(self.down_player, &mut Vec::new(), 0, 0)
+        {
+            return true;
+        }
+        self.vertcal_walls.pop();
+        false
+    }
+
+    fn wall_v_is_possible(&self, new_wall: (usize, usize)) -> bool {
+        for wall in &self.vertcal_walls {
+            if *wall == new_wall {
+                return false;
+            }
+            if wall.0 <= 6 && (wall.0 + 1, wall.1) == new_wall {
+                return false;
+            }
+            if wall.0 >= 1 && (wall.0 - 1, wall.1) == new_wall {
+                return false;
+            }
+        }
+        if self.horizontal_walls.contains(&new_wall) {
+            return false;
         }
         true
     }
@@ -205,23 +211,51 @@ pub struct QuoridorSession {
 }
 
 impl QuoridorSession {
-    pub fn new_wall(&mut self, player: &str, position: (usize, usize), wall_type: &str) -> PlayerMoveResult {
-        if player != self.current {
-            return PlayerMoveResult::WrongPlayer;
+    pub fn new_h_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
+        let player_status = self.player_is_valid(player);
+        match player_status {
+            PlayerMoveResult::Ok => (),
+            _ => return player_status,
         }
+        if !self.game.new_h_wall(position) {
+            return PlayerMoveResult::Unallowed;
+        };
         if player == self.up_player {
-            if 1 > self.game.up_player_free_walls || !self.game.new_wall(position, wall_type) {
-                return PlayerMoveResult::Unallowed;
-            }
             self.game.up_player_free_walls -= 1
-        }
-        if player == self.down_player {
-            if 1 > self.game.down_player_free_walls || !self.game.new_wall(position, wall_type) {
-                return PlayerMoveResult::Unallowed;
-            }
+        } else {
             self.game.down_player_free_walls -= 1
         }
         self.switch_players();
+        player_status
+    }
+
+    pub fn new_v_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
+        let player_status = self.player_is_valid(player);
+        match player_status {
+            PlayerMoveResult::Ok => (),
+            _ => return player_status,
+        }
+        if !self.game.new_v_wall(position) {
+            return PlayerMoveResult::Unallowed;
+        }
+        if player == self.up_player {
+            self.game.up_player_free_walls -= 1
+        } else {
+            self.game.down_player_free_walls -= 1
+        }
+        self.switch_players();
+        player_status
+    }
+
+    fn player_is_valid(&self, player: &str) -> PlayerMoveResult {
+        if player != self.current {
+            return PlayerMoveResult::WrongPlayer;
+        }
+        if player == self.up_player && 1 > self.game.up_player_free_walls
+            || player == self.down_player && 1 > self.game.down_player_free_walls
+        {
+            return PlayerMoveResult::Unallowed;
+        }
         PlayerMoveResult::Ok
     }
 
@@ -267,8 +301,8 @@ impl GameSession for QuoridorSession {
 
     fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult {
         match player_move {
-            PlayerMove::QuoridorWallH(val, player) => self.new_wall(&player, val, "h"),
-            PlayerMove::QuoridorWallV(val, player) => self.new_wall(&player, val, "v"),
+            PlayerMove::QuoridorWallH(val, player) => self.new_h_wall(&player, val),
+            PlayerMove::QuoridorWallV(val, player) => self.new_v_wall(&player, val),
             PlayerMove::QuoridorMove(val, player) => self.move_player(&player, val, ()),
             _ => PlayerMoveResult::Unknown,
         }

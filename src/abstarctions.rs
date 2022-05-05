@@ -65,16 +65,10 @@ impl Session {
             _ => None,
         }
     }
-    pub fn get_id(&self) -> i32 {
+    pub fn expose(&mut self) -> &mut QuoridorSession {
         match self {
-            Session::ActiveQuoridor(v) => v.get_id(),
-            _ => panic!("insert get_id for new Session!"),
-        }
-    }
-    pub fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult {
-        match self {
-            Session::ActiveQuoridor(v) => v.make_move(player_move),
-            _ => PlayerMoveResult::Unknown,
+            Session::ActiveQuoridor(v) => v,
+            _ => panic!("CALLED EXPOSE METHOD ON EMPTY SESSION! EMPTY SESSION IS PLACEHOLDER FOR NOT FOUND SESSION AND SHOULD NOT BE USED!"),
         }
     }
 }
@@ -187,7 +181,7 @@ impl ActiveSessions {
         let mut sessions_list = self.sessions.lock().unwrap();
         let exposed_vector = &mut *sessions_list;
         for session in exposed_vector {
-            if session.get_id() == id {
+            if session.expose().id == id {
                 return Some(session.clone());
             }
         }
@@ -198,7 +192,7 @@ impl ActiveSessions {
         let mut sessions_list = self.sessions.lock().unwrap();
         let exposed_vector = &mut *sessions_list;
         for (i, session) in exposed_vector.iter().enumerate() {
-            if session.get_id() == id {
+            if session.expose().id == id {
                 exposed_vector.remove(i);
                 return;
             }
@@ -209,8 +203,9 @@ impl ActiveSessions {
         let mut sessions_list = self.sessions.lock().unwrap();
         let exposed_vector = &mut *sessions_list;
         for session in exposed_vector {
-            if session.get_id() == id {
-                return Some(session.make_move(player_move));
+            let exposed_session = session.expose();
+            if exposed_session.id == id {
+                return Some(exposed_session.make_move(player_move));
             }
         }
         None
@@ -218,7 +213,7 @@ impl ActiveSessions {
 
     fn is_id_taken(exposed_vector: &Vec<Session>, id: i32) -> bool {
         for session in exposed_vector {
-            if session.get_id() == id {
+            if session.expose().id == id {
                 return true;
             }
         }

@@ -4,7 +4,6 @@ use rocket::serde::{Deserialize, Serialize};
 mod abstarctions;
 use abstarctions::{ActiveSessions, ChatID, Messages, PlayerMove, Room, Session, SessionRooms, SessionType};
 mod quoridor;
-use quoridor::{print_state, QuoridorSession};
 
 #[post("/move/<session>", data = "<player_move>")]
 fn make_move(
@@ -13,6 +12,7 @@ fn make_move(
     sessions: &rocket::State<ActiveSessions>,
     queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Session>>,
 ) {
+    sessions.make_move(session, player_move.into_inner());
 }
 
 #[get("/state/<session>")]
@@ -157,7 +157,7 @@ async fn events(
         loop {
             let msg = rocket::tokio::select! {
                 msg = rx.recv() => match msg {
-                    Ok(msg) => if msg.get_id() == session {msg} else {continue},
+                    Ok(msg) => if msg.expose().id == session {msg} else {continue},
                     Err(rocket::tokio::sync::broadcast::error::RecvError::Closed) => break,
                     Err(rocket::tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                 },
