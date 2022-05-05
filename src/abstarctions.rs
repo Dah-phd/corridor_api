@@ -2,7 +2,7 @@ use rocket::serde::{Deserialize, Serialize};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Mutex;
-// importing sessiong
+// importing sessions for each game
 use crate::quoridor::QuoridorSession;
 
 pub trait GameSession {
@@ -38,6 +38,8 @@ pub enum PlayerMove {
     ChessMove((usize, usize), (usize, usize)), // ((from)=>(to))
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(crate = "rocket::serde")]
 pub enum PlayerMoveResult {
     Ok,
     WrongPlayer,
@@ -65,10 +67,17 @@ impl Session {
             _ => None,
         }
     }
+    pub fn get_id(&self) -> i32 {
+        match self {
+            Session::ActiveQuoridor(v) => return v.id,
+            _ => panic!("NotFound method called!"),
+        }
+    }
+
     pub fn expose(&mut self) -> &mut QuoridorSession {
         match self {
             Session::ActiveQuoridor(v) => v,
-            _ => panic!("CALLED EXPOSE METHOD ON EMPTY SESSION! EMPTY SESSION IS PLACEHOLDER FOR NOT FOUND SESSION AND SHOULD NOT BE USED!"),
+            _ => panic!("NotFound method called!"),
         }
     }
 }
@@ -192,7 +201,7 @@ impl ActiveSessions {
         let mut sessions_list = self.sessions.lock().unwrap();
         let exposed_vector = &mut *sessions_list;
         for (i, session) in exposed_vector.iter().enumerate() {
-            if session.expose().id == id {
+            if session.get_id() == id {
                 exposed_vector.remove(i);
                 return;
             }
@@ -213,7 +222,7 @@ impl ActiveSessions {
 
     fn is_id_taken(exposed_vector: &Vec<Session>, id: i32) -> bool {
         for session in exposed_vector {
-            if session.expose().id == id {
+            if session.get_id() == id {
                 return true;
             }
         }
