@@ -201,6 +201,7 @@ impl Quoridor {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct QuoridorSession {
+    #[serde(skip_serializing)]
     pub id: i32,
     up_player: String,
     down_player: String,

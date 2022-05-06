@@ -3,6 +3,7 @@ extern crate rocket;
 use rocket::serde::{Deserialize, Serialize};
 mod abstarctions;
 use abstarctions::{ActiveSessions, ChatID, Messages, PlayerMove, PlayerMoveResult, Room, Session, SessionRooms, SessionType};
+mod auth;
 mod quoridor;
 
 //general
@@ -12,7 +13,7 @@ fn post_message(
     msg: rocket::serde::json::Json<Messages>,
     queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Messages>>,
 ) {
-    queue.send(msg.into_inner());
+    let _res = queue.send(msg.into_inner());
 }
 
 // rooms
@@ -102,10 +103,10 @@ async fn room_chat(
 }
 
 #[get("/room_events/<owner>")]
-async fn room_events(
+async fn room_events<'a>(
     owner: String,
-    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Room>>,
-    active_rooms: &rocket::State<SessionRooms>,
+    queue: &'a rocket::State<rocket::tokio::sync::broadcast::Sender<Room>>,
+    active_rooms: &'a rocket::State<SessionRooms>,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
     let mut rx = queue.subscribe();
@@ -119,13 +120,10 @@ async fn room_events(
                 },
                 _ = &mut end => break,
             };
-
             yield rocket::response::stream::Event::json(&msg);
         }
-        // active_rooms.drop(&owner);
     }
 }
-
 // sessions
 
 #[post("/move/<session>", data = "<player_move>")]
@@ -155,10 +153,10 @@ fn get_state(session: i32, active_sessions: &rocket::State<ActiveSessions>) -> r
 }
 
 #[get("/events/<session>")]
-async fn events(
+async fn events<'a>(
     session: i32,
-    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Session>>,
-    active_sessions: &rocket::State<ActiveSessions>,
+    queue: &'a rocket::State<rocket::tokio::sync::broadcast::Sender<Session>>,
+    active_sessions: &'a rocket::State<ActiveSessions>,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
     let mut rx = queue.subscribe();
@@ -174,12 +172,7 @@ async fn events(
             };
             yield rocket::response::stream::Event::json(&msg);
         };
-        // active_sessions.drop(session);
     }
-}
-
-fn drop_session(sessoin: i32, state: &rocket::State<ActiveSessions>) {
-    state.drop(sessoin)
 }
 
 #[get("/session_chat/<session>")]

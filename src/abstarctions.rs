@@ -1,3 +1,4 @@
+use chrono;
 use rocket::serde::{Deserialize, Serialize};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -89,6 +90,8 @@ pub struct Room {
     pub session_type: SessionType,
     pub player_list: Vec<String>,
     pub game_id: Option<i32>,
+    #[serde(skip_serializing)]
+    time: i64,
 }
 
 pub struct SessionRooms {
@@ -103,6 +106,7 @@ impl SessionRooms {
     }
 
     pub fn get_all(&self) -> Vec<Room> {
+        self.remove_inactive();
         return self.rooms.lock().unwrap().clone().to_vec();
     }
 
@@ -119,8 +123,20 @@ impl SessionRooms {
             session_type,
             player_list: vec![player_name.to_owned()],
             game_id: None,
+            time: chrono::Utc::now().timestamp(),
         });
         true
+    }
+
+    pub fn kick_player(&self, owner: &str, player: &str) {
+        let mut room_list = self.rooms.lock().unwrap();
+        let exposed_vector = &mut *room_list;
+        for room in exposed_vector {
+            if room.owner == owner {
+                room.player_list.retain(|pl| pl != player);
+                return;
+            }
+        }
     }
 
     pub fn get_by_owner(&self, player_name: &str) -> Option<Room> {
@@ -144,6 +160,13 @@ impl SessionRooms {
             }
         }
         false
+    }
+
+    fn remove_inactive(&self) {
+        let mut room_list = self.rooms.lock().unwrap();
+        let exposed_vector = &mut *room_list;
+        let current_time = chrono::Utc::now().timestamp() + 900;
+        exposed_vector.retain(|room| room.time > current_time)
     }
 
     pub fn drop(&self, player_name: &str) -> bool {
@@ -231,7 +254,7 @@ impl ActiveSessions {
 }
 
 pub struct EventListener {
-    event_map: HashMap<String, Vec<&'static dyn Fn(PlayerMove) -> bool>>,
+    event_map: HashMap<String, Vec<&'static fn(PlayerMove) -> bool>>,
 }
 
 impl EventListener {
@@ -241,7 +264,7 @@ impl EventListener {
         }
     }
 
-    pub fn subscribe_to_event(&mut self, event: String, func: &'static dyn Fn(PlayerMove) -> bool) {
+    pub fn subscribe_to_event(&mut self, event: String, func: &'static fn(PlayerMove) -> bool) {
         match self.event_map.entry(event) {
             Entry::Vacant(e) => {
                 e.insert(vec![func]);
