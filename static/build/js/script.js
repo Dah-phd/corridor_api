@@ -1,7 +1,16 @@
 "use strict";
 let STATE = {
-    connected: false
+    connected: false,
+    player: "guest"
 };
+function setPlayer(id) {
+    let name = document.getElementById(id);
+    if (!name) {
+        return;
+    }
+    STATE.player = name.value;
+    name.value = "";
+}
 function subscribe(uri) {
     var retryTime = 1;
     function connect(uri) {
@@ -35,13 +44,31 @@ function setConnectedStatus(status) {
     STATE.connected = status;
 }
 // subscribe('/events/')
-window.addEventListener("load", (_) => {
-    let btn = document.getElementById('sub');
-    console.log(btn);
+function setButton(button_id, callback) {
+    let btn = document.getElementById(button_id);
     if (!btn)
         return;
-    btn.addEventListener("click", (_) => {
-        let room = document.getElementById('room');
-        subscribe("events/" + room.value);
+    btn.addEventListener("click", (e) => { callback(e); });
+}
+function injectEvents() {
+    setButton("build_room", (_) => {
+        fetch("/create_room", {
+            method: "post",
+            body: JSON.stringify({
+                owner: STATE.player,
+                game: "Quoridor"
+            })
+        }).then(response => response.json()).then((data) => { console.log(data); }).catch(console.error);
     });
+    setButton("make_player", (_) => {
+        setPlayer("player");
+        let head = document.getElementById("head");
+        if (!head)
+            return;
+        head.innerHTML = STATE.player;
+        fetch("");
+    });
+}
+window.addEventListener("load", (_) => {
+    injectEvents();
 });

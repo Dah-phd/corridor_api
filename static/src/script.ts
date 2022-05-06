@@ -1,5 +1,35 @@
 let STATE = {
-    connected: false
+    connected: false,
+    player: "guest"
+}
+
+
+interface QuoridorSession {
+    id: number,
+    up_player: string,
+    down_player: string,
+    game: {
+        up_player: [number, number],
+        down_player: [number, number],
+        up_player_free_walls: number,
+        down_player_free_walls: number,
+        vertcal_walls: [number, number],    // (row, col)
+        horizontal_walls: [number, number], // (row, col)
+        winner: { Some: boolean } | string,
+    },
+    turn: number,
+    current: string,
+}
+
+interface Session {
+    ActiveQuoridor?: QuoridorSession
+}
+
+function setPlayer(id: string) {
+    let name: any = document.getElementById(id)
+    if (!name) { return }
+    STATE.player = name.value
+    name.value = ""
 }
 
 function subscribe(uri: string) {
@@ -44,16 +74,40 @@ function setConnectedStatus(status: boolean) {
 
 // subscribe('/events/')
 
+
+function setButton(button_id: string, callback: Function) {
+    let btn = document.getElementById(button_id);
+    if (!btn) return
+    btn.addEventListener(
+        "click", (e) => { callback(e) }
+    )
+}
+
+
+function injectEvents() {
+    setButton("build_room", (_: any) => {
+        fetch("/create_room", {
+            method: "post",
+            body: JSON.stringify({
+                owner: STATE.player,
+                game: "Quoridor"
+            })
+        }).then(response => response.json()).then((data) => { console.log(data) }).catch(console.error)
+    })
+    setButton(
+        "make_player", (_: any) => {
+            setPlayer("player")
+            let head = document.getElementById("head")
+            if (!head) return
+            head.innerHTML = STATE.player
+            fetch("")
+        }
+    )
+}
+
+
 window.addEventListener(
     "load", (_) => {
-        let btn = document.getElementById('sub')
-        console.log(btn)
-        if (!btn) return
-        btn.addEventListener(
-            "click", (_) => {
-                let room: any = document.getElementById('room')
-                subscribe("events/" + room.value)
-            }
-        )
+        injectEvents()
     }
 )
