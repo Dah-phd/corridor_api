@@ -121,6 +121,16 @@ function injectEvents() {
     setButton("start_game", (_) => {
         fetch('/start_game/' + STATE.player, { method: "get" });
     });
+    setButton("token", (_) => {
+        fetch('/login', {
+            method: "post", body: JSON.stringify({
+                Guest: "dah"
+            })
+        })
+            .then(response => response.json())
+            .then((data) => { console.log(data); })
+            .catch(console.error);
+    });
 }
 window.addEventListener("load", (_) => {
     injectEvents();

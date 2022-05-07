@@ -61,7 +61,7 @@ pub enum Match {
 }
 
 impl Match {
-    fn new(player_list: &Vec<String>, free_id: i32, match_type: MatchType) -> Option<Self> {
+    pub fn new(player_list: &Vec<String>, free_id: i32, match_type: MatchType) -> Option<Self> {
         match match_type {
             MatchType::Quoridor => Some(Self::ActiveQuoridor(QuoridorMatch::new(player_list, free_id))),
             _ => None,
