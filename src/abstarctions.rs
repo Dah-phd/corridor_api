@@ -3,10 +3,10 @@ use rocket::serde::{Deserialize, Serialize};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Mutex;
-// importing sessions for each game
-use crate::quoridor::QuoridorSession;
+// importing Matchs for each game
+use crate::quoridor::QuoridorMatch;
 
-pub trait GameSession {
+pub trait GameMatch {
     type Position;
     type Spec;
     fn new(player_list: &Vec<String>, id: i32) -> Self;
@@ -19,7 +19,7 @@ pub trait GameSession {
 #[serde(crate = "rocket::serde")]
 pub enum ChatID {
     RoomID(String),
-    SessionID(i32),
+    MatchID(i32),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -50,34 +50,34 @@ pub enum PlayerMoveResult {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[serde(crate = "rocket::serde")]
-pub enum SessionType {
+pub enum MatchType {
     Quoridor,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
-pub enum Session {
-    ActiveQuoridor(QuoridorSession),
+pub enum Match {
+    ActiveQuoridor(QuoridorMatch),
     NotFound,
 }
 
-impl Session {
-    fn new(player_list: &Vec<String>, free_id: i32, session_type: SessionType) -> Option<Self> {
-        match session_type {
-            SessionType::Quoridor => Some(Self::ActiveQuoridor(QuoridorSession::new(player_list, free_id))),
+impl Match {
+    fn new(player_list: &Vec<String>, free_id: i32, match_type: MatchType) -> Option<Self> {
+        match match_type {
+            MatchType::Quoridor => Some(Self::ActiveQuoridor(QuoridorMatch::new(player_list, free_id))),
             _ => None,
         }
     }
     pub fn get_id(&self) -> i32 {
         match self {
-            Session::ActiveQuoridor(v) => return v.id,
+            Match::ActiveQuoridor(v) => return v.id,
             _ => panic!("NotFound method called!"),
         }
     }
 
-    pub fn expose(&mut self) -> &mut QuoridorSession {
+    pub fn expose(&mut self) -> &mut QuoridorMatch {
         match self {
-            Session::ActiveQuoridor(v) => v,
+            Match::ActiveQuoridor(v) => v,
             _ => panic!("NotFound method called!"),
         }
     }
@@ -87,18 +87,16 @@ impl Session {
 #[serde(crate = "rocket::serde")]
 pub struct Room {
     pub owner: String,
-    pub session_type: SessionType,
+    pub match_type: MatchType,
     pub player_list: Vec<String>,
     pub game_id: Option<i32>,
-    #[serde(skip_serializing)]
-    time: i64,
 }
 
-pub struct SessionRooms {
+pub struct MatchRooms {
     pub rooms: Mutex<Vec<Room>>,
 }
 
-impl SessionRooms {
+impl MatchRooms {
     pub fn new() -> Self {
         Self {
             rooms: Mutex::new(Vec::new()),
@@ -106,11 +104,10 @@ impl SessionRooms {
     }
 
     pub fn get_all(&self) -> Vec<Room> {
-        self.remove_inactive();
         return self.rooms.lock().unwrap().clone().to_vec();
     }
 
-    pub fn new_room(&self, player_name: &str, session_type: SessionType) -> bool {
+    pub fn new_room(&self, player_name: &str, match_type: MatchType) -> bool {
         let mut room_list = self.rooms.lock().unwrap();
         let exposed_vector = &mut *room_list;
         for room in exposed_vector.iter() {
@@ -120,10 +117,9 @@ impl SessionRooms {
         }
         exposed_vector.push(Room {
             owner: player_name.to_owned(),
-            session_type,
+            match_type,
             player_list: vec![player_name.to_owned()],
             game_id: None,
-            time: chrono::Utc::now().timestamp(),
         });
         true
     }
@@ -162,13 +158,6 @@ impl SessionRooms {
         false
     }
 
-    fn remove_inactive(&self) {
-        let mut room_list = self.rooms.lock().unwrap();
-        let exposed_vector = &mut *room_list;
-        let current_time = chrono::Utc::now().timestamp() + 900;
-        exposed_vector.retain(|room| room.time > current_time)
-    }
-
     pub fn drop(&self, player_name: &str) -> bool {
         let mut room_list = self.rooms.lock().unwrap();
         let exposed_vector = &mut *room_list;
@@ -182,49 +171,49 @@ impl SessionRooms {
     }
 }
 
-pub struct ActiveSessions {
-    pub sessions: Mutex<Vec<Session>>,
+pub struct ActiveMatchs {
+    pub matchs: Mutex<Vec<Match>>,
 }
 
-impl ActiveSessions {
+impl ActiveMatchs {
     pub fn new() -> Self {
         Self {
-            sessions: Mutex::new(Vec::new()),
+            matchs: Mutex::new(Vec::new()),
         }
     }
-    pub fn append(&self, player_list: &Vec<String>, session_type: SessionType) -> Result<i32, &str> {
-        let mut sessions_list = self.sessions.lock().unwrap();
-        let exposed_vector = &mut *sessions_list;
+    pub fn append(&self, player_list: &Vec<String>, match_type: MatchType) -> Result<i32, &str> {
+        let mut matchs_list = self.matchs.lock().unwrap();
+        let exposed_vector = &mut *matchs_list;
         let mut id = 0;
-        while ActiveSessions::is_id_taken(exposed_vector, id) {
+        while ActiveMatchs::is_id_taken(exposed_vector, id) {
             id += 1
         }
-        let new_session = Session::new(player_list, id, session_type);
-        match new_session {
-            Some(session) => {
-                exposed_vector.push(session);
+        let new_match = Match::new(player_list, id, match_type);
+        match new_match {
+            Some(match_) => {
+                exposed_vector.push(match_);
                 Ok(id)
             }
-            None => Err("Unable to build session!"),
+            None => Err("Unable to build match!"),
         }
     }
 
-    pub fn get_session(&self, id: i32) -> Option<Session> {
-        let mut sessions_list = self.sessions.lock().unwrap();
-        let exposed_vector = &mut *sessions_list;
-        for session in exposed_vector {
-            if session.expose().id == id {
-                return Some(session.clone());
+    pub fn get_match(&self, id: i32) -> Option<Match> {
+        let mut matchs_list = self.matchs.lock().unwrap();
+        let exposed_vector = &mut *matchs_list;
+        for match_ in exposed_vector {
+            if match_.expose().id == id {
+                return Some(match_.clone());
             }
         }
         None
     }
 
     pub fn drop(&self, id: i32) {
-        let mut sessions_list = self.sessions.lock().unwrap();
-        let exposed_vector = &mut *sessions_list;
-        for (i, session) in exposed_vector.iter().enumerate() {
-            if session.get_id() == id {
+        let mut matchs_list = self.matchs.lock().unwrap();
+        let exposed_vector = &mut *matchs_list;
+        for (i, match_) in exposed_vector.iter().enumerate() {
+            if match_.get_id() == id {
                 exposed_vector.remove(i);
                 return;
             }
@@ -232,20 +221,20 @@ impl ActiveSessions {
     }
 
     pub fn make_move(&self, id: i32, player_move: PlayerMove) -> Option<PlayerMoveResult> {
-        let mut sessions_list = self.sessions.lock().unwrap();
-        let exposed_vector = &mut *sessions_list;
-        for session in exposed_vector {
-            let exposed_session = session.expose();
-            if exposed_session.id == id {
-                return Some(exposed_session.make_move(player_move));
+        let mut matchs_list = self.matchs.lock().unwrap();
+        let exposed_vector = &mut *matchs_list;
+        for match_ in exposed_vector {
+            let exposed_match = match_.expose();
+            if exposed_match.id == id {
+                return Some(exposed_match.make_move(player_move));
             }
         }
         None
     }
 
-    fn is_id_taken(exposed_vector: &Vec<Session>, id: i32) -> bool {
-        for session in exposed_vector {
-            if session.get_id() == id {
+    fn is_id_taken(exposed_vector: &Vec<Match>, id: i32) -> bool {
+        for match_ in exposed_vector {
+            if match_.get_id() == id {
                 return true;
             }
         }

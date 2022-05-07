@@ -1,5 +1,5 @@
 extern crate rocket;
-use crate::abstarctions::{GameSession, PlayerMove, PlayerMoveResult};
+use crate::abstarctions::{GameMatch, PlayerMove, PlayerMoveResult};
 use rocket::serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -200,7 +200,7 @@ impl Quoridor {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
-pub struct QuoridorSession {
+pub struct QuoridorMatch {
     #[serde(skip_serializing)]
     pub id: i32,
     up_player: String,
@@ -210,7 +210,7 @@ pub struct QuoridorSession {
     current: String,
 }
 
-impl QuoridorSession {
+impl QuoridorMatch {
     pub fn new_h_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
         let player_status = self.player_is_valid(player);
         match player_status {
@@ -268,11 +268,11 @@ impl QuoridorSession {
     }
 }
 
-impl GameSession for QuoridorSession {
+impl GameMatch for QuoridorMatch {
     type Position = (usize, usize);
     type Spec = ();
     fn new(player_list: &Vec<String>, id: i32) -> Self {
-        QuoridorSession {
+        QuoridorMatch {
             up_player: player_list[0].to_owned(),
             down_player: player_list[1].to_owned(),
             id,

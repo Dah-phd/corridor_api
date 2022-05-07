@@ -1,6 +1,12 @@
+extern crate chrono;
+extern crate jsonwebtoken;
 extern crate rocket;
-use rocket::http::Status;
-use std::convert::Infallible;
+
+pub struct ActiveSessions {
+    toket: String,
+    user: String,
+    timestamp: i64,
+}
 
 pub struct Auth {}
 pub struct AuthDB {}
