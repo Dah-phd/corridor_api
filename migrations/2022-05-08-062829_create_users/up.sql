@@ -1,0 +1,6 @@
+CREATE TABLE users (
+  user VARCHAR PRIMARY KEY,
+  password VARCHAR NOT NULL,
+  email VARCHAR NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT 't'
+)

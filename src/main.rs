@@ -6,8 +6,17 @@ use abstarctions::{ActiveMatchs, ChatID, Match, MatchRooms, MatchType, Messages,
 mod auth;
 use auth::{ActiveSessions, User};
 mod quoridor;
+#[macro_use]
+extern crate diesel;
+use diesel::prelude::*;
+mod models;
+mod schema;
 
 //general
+
+fn load_database() -> diesel::sqlite::SqliteConnection {
+    diesel::sqlite::SqliteConnection::establish(&"./src/db.sqlite3").expect("No database found!")
+}
 
 #[post("/login", data = "<player_data>")]
 fn login(
@@ -237,4 +246,5 @@ fn rocket() -> _ {
         .manage(rocket::tokio::sync::broadcast::channel::<Room>(1024).0)
         .manage(MatchRooms::new())
         .manage(ActiveSessions::new())
+        .manage(models::DBLink::new("./db.sqlite3"))
 }
