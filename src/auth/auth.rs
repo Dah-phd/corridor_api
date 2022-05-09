@@ -1,3 +1,5 @@
+use rocket::request;
+
 extern crate chrono;
 extern crate jsonwebtoken;
 extern crate rocket;
@@ -41,13 +43,32 @@ impl Token {
         self.encode()
     }
 
-    pub fn decode(token: String) -> Self {
-        jsonwebtoken::decode::<Self>(
+    pub fn decode(token: String) -> Option<Self> {
+        match jsonwebtoken::decode::<Self>(
             &token,
             &jsonwebtoken::DecodingKey::from_secret(KEY),
             &jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS512),
-        )
-        .unwrap()
-        .claims
+        ) {
+            Ok(v) => Some(v.claims),
+            _ => None,
+        }
+    }
+}
+
+#[rocket::async_trait]
+impl<'r> rocket::request::FromRequest<'r> for Token {
+    type Error = ();
+
+    async fn from_request(request: &'r rocket::request::Request<'_>) -> rocket::request::Outcome<Self, ()> {
+        let token_header: Vec<_> = request.headers().get("token").collect();
+        if token_header.len() != 1 {
+            return rocket::request::Outcome::Failure((rocket::http::Status::BadRequest, ()));
+        }
+        let token = token_header[0];
+        let decoded_token = Self::decode(token.to_owned());
+        match decoded_token {
+            Some(v) => rocket::request::Outcome::Success(v),
+            None => rocket::request::Outcome::Failure((rocket::http::Status::BadRequest, ())),
+        }
     }
 }
