@@ -1,3 +1,4 @@
+pub mod schema;
 pub mod users;
 use diesel;
 use diesel::prelude::*;
@@ -19,3 +20,5 @@ impl DBLink {
         callback(&mut *db)
     }
 }
+
+struct User {}

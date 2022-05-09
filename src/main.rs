@@ -4,29 +4,12 @@ use rocket::serde::{Deserialize, Serialize};
 mod abstarctions;
 use abstarctions::{ActiveMatchs, ChatID, Match, MatchRooms, MatchType, Messages, PlayerMove, PlayerMoveResult, Room};
 mod auth;
-use auth::{ActiveSessions, User};
 mod quoridor;
 #[macro_use]
 extern crate diesel;
-use diesel::prelude::*;
 mod models;
-mod schema;
 
 //general
-
-fn load_database() -> diesel::sqlite::SqliteConnection {
-    diesel::sqlite::SqliteConnection::establish(&"./src/db.sqlite3").expect("No database found!")
-}
-
-#[post("/login", data = "<player_data>")]
-fn login(
-    player_data: rocket::serde::json::Json<User>,
-    sessions: &rocket::State<ActiveSessions>,
-) -> rocket::serde::json::Json<String> {
-    let user = player_data.into_inner();
-    let token = sessions.get_token(user);
-    rocket::serde::json::Json(token)
-}
 
 #[post("/chat/sender", data = "<msg>")]
 fn post_message(
@@ -223,7 +206,6 @@ fn rocket() -> _ {
             "/",
             routes![
                 //======general
-                login,
                 post_message,
                 //======session
                 make_move,
@@ -245,6 +227,5 @@ fn rocket() -> _ {
         .manage(ActiveMatchs::new())
         .manage(rocket::tokio::sync::broadcast::channel::<Room>(1024).0)
         .manage(MatchRooms::new())
-        .manage(ActiveSessions::new())
         .manage(models::DBLink::new("./db.sqlite3"))
 }
