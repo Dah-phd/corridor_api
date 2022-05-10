@@ -33,14 +33,17 @@ fn make_room(room: rocket::serde::json::Json<RoomBase>, rooms: &rocket::State<Ma
     rocket::serde::json::Json(rooms.new_room(&room.owner, room.game))
 }
 
-#[get("/join/<owner>/<player>")]
+#[get("/join/<owner>")]
 fn join_room(
     owner: String,
-    player: String,
+    token: auth::Token,
     rooms: &rocket::State<MatchRooms>,
     room_queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Room>>,
 ) {
-    if rooms.add_player(owner.to_owned(), player) {
+    if !token.is_active() {
+        return;
+    }
+    if rooms.add_player(owner.to_owned(), token.user.to_owned()) {
         match rooms.get_by_owner(&owner) {
             Some(room) => {
                 let _res = room_queue.send(room);
@@ -71,6 +74,7 @@ fn room_to_session(
     let maybe_room = rooms.get_by_owner(&owner);
     match maybe_room {
         Some(mut room) => {
+            room.game_started = true;
             if sessions.append(&room.player_list, room.match_type) {
                 let _res = room_queue.send(room);
             };
@@ -173,9 +177,9 @@ async fn events<'a>(
     }
 }
 
-#[get("/session_chat/<session>")]
+#[get("/session_chat/<owner>")]
 async fn session_chat(
-    session: i32,
+    owner: String,
     queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Messages>>,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
@@ -184,7 +188,7 @@ async fn session_chat(
         loop {
             let msg = rocket::tokio::select! {
                 msg = rx.recv() => match msg {
-                    Ok(msg) => if msg.id == ChatID::MatchID(session) {msg} else {continue},
+                    Ok(msg) => if msg.id == ChatID::MatchID(owner.to_owned()) {msg} else {continue},
                     Err(rocket::tokio::sync::broadcast::error::RecvError::Closed) => break,
                     Err(rocket::tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                 },

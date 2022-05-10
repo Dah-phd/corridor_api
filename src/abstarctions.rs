@@ -19,7 +19,7 @@ pub trait GameMatch {
 #[serde(crate = "rocket::serde")]
 pub enum ChatID {
     RoomID(String),
-    MatchID(i32),
+    MatchID(String),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
