@@ -12,6 +12,7 @@ pub trait GameMatch {
     fn move_player(&mut self, player: &str, new_position: Self::Position, options: Self::Spec) -> PlayerMoveResult;
     fn get_owner(&self) -> String;
     fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult;
+    fn contains_player(&self, player: &str) -> bool;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -180,24 +181,24 @@ impl ActiveMatchs {
             matchs: Mutex::new(Vec::new()),
         }
     }
-    pub fn append(&self, player_list: &Vec<String>, match_type: MatchType) -> Result<String, &str> {
+    pub fn append(&self, player_list: &Vec<String>, match_type: MatchType) -> bool {
         let mut matchs_list = self.matchs.lock().unwrap();
         let exposed_vector = &mut *matchs_list;
         let new_match = Match::new(player_list, player_list[0].to_owned(), match_type);
         match new_match {
             Some(match_) => {
                 exposed_vector.push(match_);
-                Ok(player_list[0].to_owned())
+                true
             }
-            None => Err("Unable to build match!"),
+            None => false,
         }
     }
 
-    pub fn get_match(&self, owner: &String) -> Option<Match> {
+    pub fn get_match(&self, player: &String) -> Option<Match> {
         let mut matchs_list = self.matchs.lock().unwrap();
         let exposed_vector = &mut *matchs_list;
         for match_ in exposed_vector {
-            if match_.expose().owner == *owner {
+            if match_.expose().contains_player(player) {
                 return Some(match_.clone());
             }
         }

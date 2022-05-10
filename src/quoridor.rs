@@ -307,6 +307,13 @@ impl GameMatch for QuoridorMatch {
             _ => PlayerMoveResult::Unknown,
         }
     }
+
+    fn contains_player(&self, player: &str) -> bool {
+        if self.up_player == player || self.down_player == player {
+            return true;
+        }
+        false
+    }
 }
 
 // used for testing

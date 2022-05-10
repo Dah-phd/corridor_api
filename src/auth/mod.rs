@@ -1,5 +1,6 @@
 mod auth;
 use super::models;
+pub use auth::Token;
 use diesel;
 
 pub fn register(user: String, password: String, email: String) {

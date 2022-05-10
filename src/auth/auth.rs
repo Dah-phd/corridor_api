@@ -10,7 +10,7 @@ const KEY: &[u8] = b"secret";
 #[derive(rocket::serde::Serialize, rocket::serde::Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct Token {
-    user: String,
+    pub user: String,
     timestamp: i64,
 }
 

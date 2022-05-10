@@ -59,24 +59,21 @@ fn get_all_rooms(rooms: &rocket::State<MatchRooms>) -> rocket::serde::json::Json
 #[serde(crate = "rocket::serde")]
 struct RoomToMatch(Option<i32>);
 
-#[get("/start_game/<owner>")]
+#[get("/start_game")]
 fn room_to_session(
-    owner: String,
+    token: auth::Token,
     rooms: &rocket::State<MatchRooms>,
     room_queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Room>>,
     sessions: &rocket::State<ActiveMatchs>,
 ) {
+    if !token.is_active() {}
+    let owner = token.user;
     let maybe_room = rooms.get_by_owner(&owner);
     match maybe_room {
         Some(mut room) => {
-            let new_session = sessions.append(&room.player_list, room.match_type);
-            match new_session {
-                Ok(id) => {
-                    room.game_started = true;
-                    let _res = room_queue.send(room);
-                }
-                Err(_) => (),
-            }
+            if sessions.append(&room.player_list, room.match_type) {
+                let _res = room_queue.send(room);
+            };
         }
         None => (),
     }
