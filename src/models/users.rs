@@ -1,4 +1,6 @@
 use super::schema::users;
+use rocket;
+use rocket::serde::{Deserialize, Serialize};
 
 #[derive(Queryable)]
 pub struct Users {
@@ -8,6 +10,8 @@ pub struct Users {
     pub active: bool,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(crate = "rocket::serde")]
 #[derive(Insertable)]
 #[table_name = "users"]
 pub struct NewUser {

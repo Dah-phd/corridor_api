@@ -206,6 +206,8 @@ fn rocket() -> _ {
         .mount(
             "/",
             routes![
+                auth::login,
+                auth::register,
                 //======general
                 post_message,
                 //======session

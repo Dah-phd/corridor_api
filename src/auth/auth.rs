@@ -1,32 +1,31 @@
-use rocket::request;
-
 extern crate chrono;
 extern crate jsonwebtoken;
 extern crate rocket;
 
-const TOKEN_LIFE: i64 = 900;
+// const TOKEN_LIFE: i64 = 900;
 const KEY: &[u8] = b"secret";
 
 #[derive(rocket::serde::Serialize, rocket::serde::Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct Token {
     pub user: String,
-    timestamp: i64,
+    // timestamp: i64,
 }
 
 impl Token {
     pub fn new(user: String) -> Self {
         Self {
             user,
-            timestamp: chrono::Utc::now().timestamp(),
+            // timestamp: chrono::Utc::now().timestamp(),
         }
     }
 
     pub fn is_active(&self) -> bool {
-        if chrono::Utc::now().timestamp() - TOKEN_LIFE > self.timestamp {
-            return true;
-        }
-        false
+        return true;
+        // if chrono::Utc::now().timestamp() - TOKEN_LIFE > self.timestamp {
+        //     return true;
+        // }
+        // false
     }
 
     pub fn encode(self) -> String {
@@ -38,10 +37,10 @@ impl Token {
         token.unwrap()
     }
 
-    pub fn refresh(mut self) -> String {
-        self.timestamp = chrono::Utc::now().timestamp();
-        self.encode()
-    }
+    // pub fn refresh(mut self) -> String {
+    //     self.timestamp = chrono::Utc::now().timestamp();
+    //     self.encode()
+    // }
 
     pub fn decode(token: String) -> Option<Self> {
         match jsonwebtoken::decode::<Self>(

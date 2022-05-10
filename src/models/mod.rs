@@ -15,10 +15,13 @@ impl DBLink {
         }
     }
 
-    pub fn run_callback<T, E>(&self, callback: fn(&diesel::sqlite::SqliteConnection) -> Result<T, E>) -> Result<T, E> {
+    pub fn run_callback<X, E>(
+        &self,
+        callback: fn(&diesel::sqlite::SqliteConnection, X) -> diesel::QueryResult<E>,
+        state: X,
+    ) -> diesel::QueryResult<E> {
         let mut db = self.mutex_db.lock().unwrap();
-        callback(&mut *db)
+        let conn = &mut *db;
+        callback(conn, state)
     }
 }
-
-struct User {}
