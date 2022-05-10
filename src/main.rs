@@ -72,7 +72,7 @@ fn room_to_session(
             let new_session = sessions.append(&room.player_list, room.match_type);
             match new_session {
                 Ok(id) => {
-                    room.game_id = Some(id);
+                    room.game_started = true;
                     let _res = room_queue.send(room);
                 }
                 Err(_) => (),
@@ -128,35 +128,35 @@ async fn room_events<'a>(
 }
 // sessions
 
-#[post("/move/<session>", data = "<player_move>")]
+#[post("/move/<owner>", data = "<player_move>")]
 fn make_move(
-    session: i32,
+    owner: String,
     player_move: rocket::serde::json::Json<PlayerMove>,
     sessions: &rocket::State<ActiveMatchs>,
     queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Match>>,
 ) -> rocket::serde::json::Json<PlayerMoveResult> {
-    let move_result: PlayerMoveResult = match sessions.make_move(session, player_move.into_inner()) {
+    let move_result: PlayerMoveResult = match sessions.make_move(&owner, player_move.into_inner()) {
         Some(v) => v,
         None => return rocket::serde::json::Json(PlayerMoveResult::Unknown),
     };
     if let PlayerMoveResult::Ok = move_result {
-        let _ = queue.send(sessions.get_match(session).unwrap());
+        let _ = queue.send(sessions.get_match(&owner).unwrap());
     }
     rocket::serde::json::Json(move_result)
 }
 
-#[get("/state/<session>")]
-fn get_state(session: i32, active_sessions: &rocket::State<ActiveMatchs>) -> rocket::serde::json::Json<Match> {
-    let session_state = active_sessions.get_match(session);
+#[get("/state/<owner>")]
+fn get_state(owner: String, active_sessions: &rocket::State<ActiveMatchs>) -> rocket::serde::json::Json<Match> {
+    let session_state = active_sessions.get_match(&owner);
     match session_state {
         None => rocket::serde::json::Json(Match::NotFound),
         Some(active_session) => rocket::serde::json::Json(active_session),
     }
 }
 
-#[get("/events/<session>")]
+#[get("/events/<owner>")]
 async fn events<'a>(
-    session: i32,
+    owner: String,
     queue: &'a rocket::State<rocket::tokio::sync::broadcast::Sender<Match>>,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
@@ -165,7 +165,7 @@ async fn events<'a>(
         loop {
             let msg = rocket::tokio::select! {
                 msg = rx.recv() => match msg {
-                    Ok(msg) => if msg.get_id() == session {msg} else {continue},
+                    Ok(msg) => if msg.get_owner() == owner {msg} else {continue},
                     Err(rocket::tokio::sync::broadcast::error::RecvError::Closed) => break,
                     Err(rocket::tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                 },

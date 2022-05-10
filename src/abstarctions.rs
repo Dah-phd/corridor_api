@@ -8,9 +8,9 @@ use crate::quoridor::QuoridorMatch;
 pub trait GameMatch {
     type Position;
     type Spec;
-    fn new(player_list: &Vec<String>, id: i32) -> Self;
+    fn new(player_list: &Vec<String>, owner: String) -> Self;
     fn move_player(&mut self, player: &str, new_position: Self::Position, options: Self::Spec) -> PlayerMoveResult;
-    fn get_id(&self) -> i32;
+    fn get_owner(&self) -> String;
     fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult;
 }
 
@@ -61,15 +61,15 @@ pub enum Match {
 }
 
 impl Match {
-    pub fn new(player_list: &Vec<String>, free_id: i32, match_type: MatchType) -> Option<Self> {
+    pub fn new(player_list: &Vec<String>, owner: String, match_type: MatchType) -> Option<Self> {
         match match_type {
-            MatchType::Quoridor => Some(Self::ActiveQuoridor(QuoridorMatch::new(player_list, free_id))),
+            MatchType::Quoridor => Some(Self::ActiveQuoridor(QuoridorMatch::new(player_list, owner))),
             _ => None,
         }
     }
-    pub fn get_id(&self) -> i32 {
+    pub fn get_owner(&self) -> String {
         match self {
-            Match::ActiveQuoridor(v) => return v.id,
+            Match::ActiveQuoridor(v) => return v.owner.to_owned(),
             _ => panic!("NotFound method called!"),
         }
     }
@@ -88,7 +88,7 @@ pub struct Room {
     pub owner: String,
     pub match_type: MatchType,
     pub player_list: Vec<String>,
-    pub game_id: Option<i32>,
+    pub game_started: bool,
 }
 
 pub struct MatchRooms {
@@ -118,7 +118,7 @@ impl MatchRooms {
             owner: player_name.to_owned(),
             match_type,
             player_list: vec![player_name.to_owned()],
-            game_id: None,
+            game_started: false,
         });
         true
     }
@@ -180,60 +180,56 @@ impl ActiveMatchs {
             matchs: Mutex::new(Vec::new()),
         }
     }
-    pub fn append(&self, player_list: &Vec<String>, match_type: MatchType) -> Result<i32, &str> {
+    pub fn append(&self, player_list: &Vec<String>, match_type: MatchType) -> Result<String, &str> {
         let mut matchs_list = self.matchs.lock().unwrap();
         let exposed_vector = &mut *matchs_list;
-        let mut id = 0;
-        while ActiveMatchs::is_id_taken(exposed_vector, id) {
-            id += 1
-        }
-        let new_match = Match::new(player_list, id, match_type);
+        let new_match = Match::new(player_list, player_list[0].to_owned(), match_type);
         match new_match {
             Some(match_) => {
                 exposed_vector.push(match_);
-                Ok(id)
+                Ok(player_list[0].to_owned())
             }
             None => Err("Unable to build match!"),
         }
     }
 
-    pub fn get_match(&self, id: i32) -> Option<Match> {
+    pub fn get_match(&self, owner: &String) -> Option<Match> {
         let mut matchs_list = self.matchs.lock().unwrap();
         let exposed_vector = &mut *matchs_list;
         for match_ in exposed_vector {
-            if match_.expose().id == id {
+            if match_.expose().owner == *owner {
                 return Some(match_.clone());
             }
         }
         None
     }
 
-    pub fn drop(&self, id: i32) {
+    pub fn drop(&self, owner: &String) {
         let mut matchs_list = self.matchs.lock().unwrap();
         let exposed_vector = &mut *matchs_list;
         for (i, match_) in exposed_vector.iter().enumerate() {
-            if match_.get_id() == id {
+            if match_.get_owner() == *owner {
                 exposed_vector.remove(i);
                 return;
             }
         }
     }
 
-    pub fn make_move(&self, id: i32, player_move: PlayerMove) -> Option<PlayerMoveResult> {
+    pub fn make_move(&self, owner: &String, player_move: PlayerMove) -> Option<PlayerMoveResult> {
         let mut matchs_list = self.matchs.lock().unwrap();
         let exposed_vector = &mut *matchs_list;
         for match_ in exposed_vector {
             let exposed_match = match_.expose();
-            if exposed_match.id == id {
+            if exposed_match.owner == *owner {
                 return Some(exposed_match.make_move(player_move));
             }
         }
         None
     }
 
-    fn is_id_taken(exposed_vector: &Vec<Match>, id: i32) -> bool {
+    fn is_id_taken(exposed_vector: &Vec<Match>, owner: &String) -> bool {
         for match_ in exposed_vector {
-            if match_.get_id() == id {
+            if match_.get_owner() == *owner {
                 return true;
             }
         }

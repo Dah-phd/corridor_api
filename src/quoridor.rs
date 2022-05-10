@@ -202,7 +202,7 @@ impl Quoridor {
 #[serde(crate = "rocket::serde")]
 pub struct QuoridorMatch {
     #[serde(skip_serializing)]
-    pub id: i32,
+    pub owner: String,
     up_player: String,
     down_player: String,
     game: Quoridor,
@@ -271,11 +271,11 @@ impl QuoridorMatch {
 impl GameMatch for QuoridorMatch {
     type Position = (usize, usize);
     type Spec = ();
-    fn new(player_list: &Vec<String>, id: i32) -> Self {
+    fn new(player_list: &Vec<String>, owner: String) -> Self {
         QuoridorMatch {
             up_player: player_list[0].to_owned(),
             down_player: player_list[1].to_owned(),
-            id,
+            owner,
             game: Quoridor::new(),
             turn: 0,
             current: player_list[0].to_owned(),
@@ -295,8 +295,8 @@ impl GameMatch for QuoridorMatch {
         PlayerMoveResult::Ok
     }
 
-    fn get_id(&self) -> i32 {
-        self.id
+    fn get_owner(&self) -> String {
+        self.owner.to_owned()
     }
 
     fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult {
