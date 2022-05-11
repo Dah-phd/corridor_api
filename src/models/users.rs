@@ -24,4 +24,7 @@ impl NewUser {
     pub fn new(user: String, password: String, email: String) -> Self {
         Self { user, password, email }
     }
+    pub fn encode_password(&mut self) {
+        self;
+    }
 }
