@@ -231,4 +231,5 @@ fn rocket() -> _ {
         .manage(rocket::tokio::sync::broadcast::channel::<Room>(1024).0)
         .manage(MatchRooms::new())
         .manage(models::DBLink::new("./db.sqlite3"))
+        .manage(models::UserModel::new())
 }

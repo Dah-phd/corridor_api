@@ -17,31 +17,33 @@ pub enum User {
 pub fn login(
     user: rocket::serde::json::Json<User>,
     db: &rocket::State<models::DBLink>,
+    users: &rocket::State<models::UserModel>,
 ) -> rocket::serde::json::Json<Option<String>> {
     match user.into_inner() {
         User::User(username, password) => {
-            if db.confirm_user(&username, password) {
+            if users.authenticate(db, &username, &password) {
                 return rocket::serde::json::Json(Option::Some(Token::new(username).encode()));
             }
         }
-        User::Guest(username) => if db.new_guest(username) {},
+        User::Guest(username) => if users.new_guest(username) {},
     }
     rocket::serde::json::Json(None)
 }
 
 #[post("/auth/register", data = "<new_user>")]
 pub fn register(
-    new_user: rocket::serde::json::Json<models::users::NewUser>,
+    new_user: rocket::serde::json::Json<models::users::User>,
     db: &rocket::State<models::DBLink>,
+    users: &rocket::State<models::UserModel>,
 ) -> rocket::serde::json::Json<Option<String>> {
-    let new_user_data = new_user.into_inner();
-    fn insert_into_db(conn: &diesel::SqliteConnection, payload: &models::users::NewUser) -> diesel::QueryResult<usize> {
-        diesel::insert_into(models::schema::users::table)
-            .values(payload)
-            .execute(conn)
-    }
+    let new_user_data = new_user.into_inner().hash_password();
+    let mut db = db.mutex_db.lock().unwrap();
+    let conn = &*db;
+    let writing_result = diesel::insert_into(models::schema::users::table)
+        .values(&new_user_data)
+        .execute(conn);
 
-    match db.run_callback(insert_into_db, &new_user_data) {
+    match writing_result {
         diesel::QueryResult::Ok(_) => {
             let token = Token::new(new_user_data.user).encode();
             rocket::serde::json::Json(Some(token))

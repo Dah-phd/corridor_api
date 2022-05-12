@@ -2,7 +2,6 @@ extern crate chrono;
 extern crate jsonwebtoken;
 extern crate rocket;
 
-// const TOKEN_LIFE: i64 = 900;
 const KEY: &[u8] = b"secret";
 
 #[derive(rocket::serde::Serialize, rocket::serde::Deserialize)]

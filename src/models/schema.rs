@@ -1,6 +1,6 @@
 table! {
     users (user) {
-        user -> Nullable<Text>,
+        user -> Text,
         password -> Text,
         email -> Text,
         active -> Bool,
