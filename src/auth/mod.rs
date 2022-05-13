@@ -25,7 +25,11 @@ pub fn login(
                 return rocket::serde::json::Json(Option::Some(Token::new(username).encode()));
             }
         }
-        User::Guest(username) => if users.new_guest(username) {},
+        User::Guest(username) => {
+            if users.new_guest(&username) {
+                return rocket::serde::json::Json(Option::Some(Token::new(username).encode()));
+            }
+        }
     }
     rocket::serde::json::Json(None)
 }

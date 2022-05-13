@@ -3,6 +3,10 @@ use pwhash;
 use rocket;
 use rocket::serde::{Deserialize, Serialize};
 
+fn default_player_status() -> bool {
+    true
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
 #[derive(Queryable, Insertable)]
@@ -11,6 +15,7 @@ pub struct User {
     pub user: String,
     pub password: String,
     pub email: String,
+    #[serde(default = "default_player_status")]
     pub active: bool,
 }
 

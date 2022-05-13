@@ -1,6 +1,60 @@
-let STATE = {
+const LOGIN_URL = "/auth/login"
+const REGISTER_URL = "/auth/register"
+
+const STATE = {
     connected: false,
-    player: "guest"
+}
+
+function login(username: string, password: string) {
+    fetch(
+        LOGIN_URL,
+        { method: 'post', body: JSON.stringify({ User: [username, password] }) }
+    )
+}
+
+function registerUser(username: string, password: string, email: string) {
+    if (password.length > 72) return "password too long"
+    fetch(
+        REGISTER_URL,
+        {
+            method: 'post', body: JSON.stringify({
+                User: {
+                    user: username,
+                    password: password,
+                    email: email,
+                }
+            })
+        }
+    )
+        .then(resp => resp.json())
+        .then((json_data) => {
+            if ("None" in json_data) { alert("Username already taken") } else { setToken(json_data["Some"]) }
+        })
+        .catch(alert)
+}
+
+function registerGues(username: string) {
+    fetch(
+        LOGIN_URL,
+        { method: 'post', body: JSON.stringify({ Guest: username }) }
+    )
+        .then(resp => resp.json())
+        .then((json_data) => {
+            if ("None" in json_data) { "Guest username already taken" } else { setToken(json_data["Some"]) }
+        })
+        .catch(alert)
+}
+
+function setToken(token: string) { setCookie('token', token) }
+
+function setCookie(name: string, value: string, days: number = 30) {
+    let expires = "";
+    if (days) {
+        let date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "") + expires + "; path=/";
 }
 
 
@@ -25,10 +79,10 @@ interface Session {
     ActiveQuoridor?: QuoridorSession
 }
 
+
 function setPlayer(id: string) {
     let name: any = document.getElementById(id)
     if (!name) { return }
-    STATE.player = name.value
     name.value = ""
 }
 
@@ -132,61 +186,3 @@ class Subscribtion {
     }
 
 }
-
-function injectEvents() {
-    setButton("build_room", (_: any) => {
-        fetch("/create_room", {
-            method: "post",
-            body: JSON.stringify({
-                owner: STATE.player,
-                game: "Quoridor"
-            })
-        })
-            .then(response => response.json())
-            .then((data) => {
-                console.log(data); if (data === true) new Subscribtion("/room_events/" + STATE.player, hasGameStarted)
-            })
-            .catch(console.error)
-    })
-    setButton(
-        "make_player", (_: any) => {
-            setPlayer("player")
-            let head = document.getElementById("head")
-            if (!head) return
-            head.innerHTML = STATE.player
-            fetch("/opened_rooms", { method: "get" }).then(response => response.json()).then((data) => console.log(data)).catch(console.error)
-        }
-    )
-    setButton(
-        "join_room", (_: any) => {
-            let room_owner: any = document.getElementById('room')
-            if (!room_owner) return
-            new Subscribtion("/room_events/" + room_owner.value, hasGameStarted)
-            fetch("/join/" + room_owner.value + "/" + STATE.player, { method: "get" }).catch(console.error)
-        }
-    )
-    setButton(
-        "start_game", (_: any) => {
-            fetch('/start_game/' + STATE.player, { method: "get" })
-        }
-    )
-    setButton(
-        "token", (_: any) => {
-            fetch('/login', {
-                method: "post", body: JSON.stringify({
-                    Guest: "dah"
-                })
-            })
-                .then(response => response.json())
-                .then((data) => { console.log(data) })
-                .catch(console.error)
-        }
-    )
-}
-
-
-window.addEventListener(
-    "load", (_) => {
-        injectEvents()
-    }
-)
