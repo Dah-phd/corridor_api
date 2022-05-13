@@ -36,16 +36,13 @@ pub fn register(
     db: &rocket::State<models::DBLink>,
     users: &rocket::State<models::UserModel>,
 ) -> rocket::serde::json::Json<Option<String>> {
-    let new_user_data = new_user.into_inner().hash_password();
-    let mut db = db.mutex_db.lock().unwrap();
-    let conn = &*db;
-    let writing_result = diesel::insert_into(models::schema::users::table)
-        .values(&new_user_data)
-        .execute(conn);
+    let user_data = new_user.into_inner();
+    let username = user_data.user.to_owned();
+    let writing_result = users.new_user(db, user_data);
 
     match writing_result {
         diesel::QueryResult::Ok(_) => {
-            let token = Token::new(new_user_data.user).encode();
+            let token = Token::new(username).encode();
             rocket::serde::json::Json(Some(token))
         }
         _ => rocket::serde::json::Json(None),
