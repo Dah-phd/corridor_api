@@ -59,14 +59,11 @@ impl<'r> rocket::request::FromRequest<'r> for Token {
 
     async fn from_request(request: &'r rocket::request::Request<'_>) -> rocket::request::Outcome<Self, ()> {
         let token_header: Vec<_> = request.headers().get("token").collect();
-        if token_header.len() != 1 {
-            return rocket::request::Outcome::Failure((rocket::http::Status::BadRequest, ()));
+        if token_header.len() == 1 {
+            if let Some(token) = Self::decode(token_header[0].to_owned()) {
+                return rocket::request::Outcome::Success(token);
+            }
         }
-        let token = token_header[0];
-        let decoded_token = Self::decode(token.to_owned());
-        match decoded_token {
-            Some(v) => rocket::request::Outcome::Success(v),
-            None => rocket::request::Outcome::Failure((rocket::http::Status::BadRequest, ())),
-        }
+        rocket::request::Outcome::Failure((rocket::http::Status::Forbidden, ()))
     }
 }

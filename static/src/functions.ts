@@ -2,7 +2,6 @@ const LOGIN_URL = "/auth/login"
 const REGISTER_URL = "/auth/register"
 
 const STATE = {
-    connected: false,
 }
 
 function login(username: string, password: string) {
@@ -28,7 +27,7 @@ function registerUser(username: string, password: string, email: string) {
     )
         .then(resp => resp.json())
         .then((json_data) => {
-            if ("None" in json_data) { alert("Username already taken") } else { setToken(json_data["Some"]) }
+            if ("Ok"! in json_data) { setToken(json_data["Some"]) } else { alert("Username already taken!") }
         })
         .catch(alert)
 }
@@ -94,42 +93,6 @@ function setPlayer(id: string) {
     name.value = ""
 }
 
-function subscribe(uri: string, callback: Function) {
-    let retryTime = 1;
-
-    function connect(uri: string) {
-        const events = new EventSource(uri);
-
-        events.addEventListener("message", (ev) => { callback(ev) });
-
-        events.addEventListener("open", () => {
-            setConnectedStatus(true);
-            console.log(`connected to event stream at ${uri}`);
-            retryTime = 1;
-        });
-
-        events.addEventListener("error", () => {
-            setConnectedStatus(false);
-            events.close();
-
-            let timeout = retryTime;
-            retryTime = Math.min(64, retryTime * 2);
-            console.log(`connection lost. attempting to reconnect in ${timeout}s`);
-            setTimeout(() => connect(uri), (() => timeout * 1000)());
-        });
-    }
-
-    connect(uri);
-}
-
-// Set the connection status: `true` for connected, `false` for disconnected.
-function setConnectedStatus(status: boolean) {
-    STATE.connected = status;
-}
-
-
-// subscribe('/events/')
-
 
 function setButton(button_id: string, callback: Function) {
     let btn = document.getElementById(button_id);
@@ -139,21 +102,6 @@ function setButton(button_id: string, callback: Function) {
     )
 }
 
-function paintGame(obj: string) {
-    console.log(obj)
-}
-
-function hasGameStarted(obj: MessageEvent, room_sub: Subscribtion) {
-    let json = JSON.parse(obj.data)
-    console.log(json)
-    let id = json['game_id']
-    if (id == null) return
-    room_sub.kill()
-    fetch("/state/" + id, { method: "get" })
-        .then(response => response.json())
-        .then((data) => paintGame(data))
-    new Subscribtion("/events/" + id, paintGame)
-}
 
 class Subscribtion {
     status: boolean

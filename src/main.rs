@@ -14,6 +14,7 @@ mod models;
 #[post("/chat/sender", data = "<msg>")]
 fn post_message(
     msg: rocket::serde::json::Json<Messages>,
+    token: auth::Token,
     queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Messages>>,
 ) {
     let _res = queue.send(msg.into_inner());
@@ -54,7 +55,7 @@ fn join_room(
 }
 
 #[get("/opened_rooms")]
-fn get_all_rooms(rooms: &rocket::State<MatchRooms>) -> rocket::serde::json::Json<Vec<Room>> {
+fn get_all_rooms(rooms: &rocket::State<MatchRooms>, token: auth::Token) -> rocket::serde::json::Json<Vec<Room>> {
     rocket::serde::json::Json(rooms.get_all())
 }
 
@@ -86,9 +87,15 @@ fn room_to_session(
 #[get("/room_chat/<room_owner>")]
 async fn room_chat(
     room_owner: String,
+    rooms: &rocket::State<MatchRooms>,
     queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Messages>>,
+    token: auth::Token,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
+    let room = rooms.get_by_owner(&room_owner);
+    // match room {
+    //     _ => rocket::response::Redirect::to();
+    // }
     let mut rx = queue.subscribe();
     rocket::response::stream::EventStream! {
         loop {
@@ -159,6 +166,7 @@ fn get_state(owner: String, active_sessions: &rocket::State<ActiveMatchs>) -> ro
 async fn events<'a>(
     owner: String,
     queue: &'a rocket::State<rocket::tokio::sync::broadcast::Sender<Match>>,
+    toket: auth::Token,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
     let mut rx = queue.subscribe();
@@ -206,16 +214,14 @@ fn rocket() -> _ {
         .mount(
             "/",
             routes![
+                auth::unauthorized,
                 auth::login,
                 auth::register,
-                //======general
                 post_message,
-                //======session
                 make_move,
                 session_chat,
                 events,
                 get_state,
-                //======rooms
                 room_to_session,
                 get_all_rooms,
                 join_room,
@@ -225,6 +231,7 @@ fn rocket() -> _ {
             ],
         )
         .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static/build")))
+        .register("/", catchers![auth::forbidden])
         .manage(rocket::tokio::sync::broadcast::channel::<Messages>(1024).0)
         .manage(rocket::tokio::sync::broadcast::channel::<Match>(1024).0)
         .manage(ActiveMatchs::new())
