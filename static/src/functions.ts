@@ -33,7 +33,7 @@ function registerUser(username: string, password: string, email: string) {
         .catch(alert)
 }
 
-function registerGues(username: string) {
+function registerGuest(username: string) {
     fetch(
         LOGIN_URL,
         { method: 'post', body: JSON.stringify({ Guest: username }) }
@@ -45,7 +45,9 @@ function registerGues(username: string) {
         .catch(alert)
 }
 
-function setToken(token: string) { setCookie('token', token) }
+function setToken(token: string) { setCookie('gamertag', token) }
+
+function getToken(): string { return getCookie('gamertag') }
 
 function setCookie(name: string, value: string, days: number = 30) {
     let expires = "";
@@ -57,6 +59,12 @@ function setCookie(name: string, value: string, days: number = 30) {
     document.cookie = name + "=" + (value || "") + expires + "; path=/";
 }
 
+function getCookie(cookie_name: string): string {
+    let re = new RegExp(`(?<=${cookie_name}=)[^;]*`)
+    let cookie_result = document.cookie.match(re)
+    if (!cookie_result) { return "this-cookie-doesn't-exist" }
+    return cookie_result[0]
+}
 
 interface QuoridorSession {
     id: number,
@@ -186,3 +194,8 @@ class Subscribtion {
     }
 
 }
+
+window.addEventListener('load', () => {
+    setToken("secret")
+    console.log(getToken())
+})
