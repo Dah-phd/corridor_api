@@ -15,21 +15,6 @@ pub trait GameMatch {
     fn contains_player(&self, player: &str) -> bool;
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(crate = "rocket::serde")]
-pub enum ChatID {
-    RoomID(String),
-    MatchID(String),
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(crate = "rocket::serde")]
-pub struct Messages {
-    pub id: ChatID,
-    pub msg: String,
-    pub player: String,
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub enum PlayerMove {
@@ -238,35 +223,35 @@ impl ActiveMatchs {
     }
 }
 
-pub struct EventListener {
-    event_map: HashMap<String, Vec<&'static fn(PlayerMove) -> bool>>,
-}
+// pub struct EventListener {
+//     event_map: HashMap<String, Vec<&'static fn(PlayerMove) -> bool>>,
+// }
 
-impl EventListener {
-    pub fn new() -> EventListener {
-        EventListener {
-            event_map: HashMap::new(),
-        }
-    }
+// impl EventListener {
+//     pub fn new() -> EventListener {
+//         EventListener {
+//             event_map: HashMap::new(),
+//         }
+//     }
 
-    pub fn subscribe_to_event(&mut self, event: String, func: &'static fn(PlayerMove) -> bool) {
-        match self.event_map.entry(event) {
-            Entry::Vacant(e) => {
-                e.insert(vec![func]);
-            }
-            Entry::Occupied(mut e) => {
-                e.get_mut().push(func);
-            }
-        }
-    }
-    pub fn pass_event(&self, event: String, data: PlayerMove) {
-        match self.event_map.get(&event) {
-            Some(func_ls) => {
-                for func in func_ls {
-                    func(data.clone());
-                }
-            }
-            None => (),
-        }
-    }
-}
+//     pub fn subscribe_to_event(&mut self, event: String, func: &'static fn(PlayerMove) -> bool) {
+//         match self.event_map.entry(event) {
+//             Entry::Vacant(e) => {
+//                 e.insert(vec![func]);
+//             }
+//             Entry::Occupied(mut e) => {
+//                 e.get_mut().push(func);
+//             }
+//         }
+//     }
+//     pub fn pass_event(&self, event: String, data: PlayerMove) {
+//         match self.event_map.get(&event) {
+//             Some(func_ls) => {
+//                 for func in func_ls {
+//                     func(data.clone());
+//                 }
+//             }
+//             None => (),
+//         }
+//     }
+// }

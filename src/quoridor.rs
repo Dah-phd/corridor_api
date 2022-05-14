@@ -1,5 +1,5 @@
 extern crate rocket;
-use crate::abstarctions::{GameMatch, PlayerMove, PlayerMoveResult};
+use crate::game_abstractions::{GameMatch, PlayerMove, PlayerMoveResult};
 use rocket::serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

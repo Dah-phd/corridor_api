@@ -1,9 +1,11 @@
 #[macro_use]
 extern crate rocket;
 use rocket::serde::{Deserialize, Serialize};
-mod abstarctions;
-use abstarctions::{ActiveMatchs, ChatID, Match, MatchRooms, MatchType, Messages, PlayerMove, PlayerMoveResult, Room};
+mod game_abstractions;
+use game_abstractions::{ActiveMatchs, Match, MatchRooms, MatchType, PlayerMove, PlayerMoveResult, Room};
 mod auth;
+mod messages;
+use messages::{ChatID, Messages};
 mod quoridor;
 #[macro_use]
 extern crate diesel;
@@ -214,7 +216,6 @@ fn rocket() -> _ {
         .mount(
             "/",
             routes![
-                auth::unauthorized,
                 auth::login,
                 auth::register,
                 post_message,

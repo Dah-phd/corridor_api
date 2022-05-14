@@ -11,6 +11,8 @@ function login(username: string, password: string) {
     )
 }
 
+function logout() { setCookie('gamertag', '', -1) }
+
 function registerUser(username: string, password: string, email: string) {
     if (password.length > 72) return "password too long"
     fetch(
@@ -144,6 +146,5 @@ class Subscribtion {
 }
 
 window.addEventListener('load', () => {
-    setToken("secret")
-    console.log(getToken())
+
 })
