@@ -5,7 +5,7 @@ use diesel;
 use diesel::prelude::*;
 use std::collections::HashMap;
 use std::sync::Mutex;
-use users::User;
+use users::UserEntry;
 
 pub struct DBLink {
     pub mutex_db: Mutex<diesel::sqlite::SqliteConnection>,
@@ -29,7 +29,7 @@ impl UserModel {
         }
     }
 
-    pub fn new_user(&self, db: &DBLink, new_user: User) -> QueryResult<usize> {
+    pub fn new_user(&self, db: &DBLink, new_user: UserEntry) -> QueryResult<usize> {
         let db = db.mutex_db.lock().unwrap();
         let conn = &*db;
         diesel::insert_into(schema::users::table)
@@ -40,8 +40,10 @@ impl UserModel {
         let mut guests = self.mutex_guests.lock().unwrap();
         let exposed_hash = &mut *guests;
         let now = chrono::Utc::now().timestamp();
-        exposed_hash.retain(|_, v| *v < now);
-        if exposed_hash.contains_key(user_name) {
+        println!("{exposed_hash:?}");
+        exposed_hash.retain(|_, v| *v > now);
+        println!("{exposed_hash:?}");
+        if !exposed_hash.contains_key(user_name) {
             exposed_hash.insert(user_name.to_owned(), chrono::Utc::now().timestamp() + 1800);
             return true;
         }
@@ -51,7 +53,7 @@ impl UserModel {
         let db = db.mutex_db.lock().unwrap();
         let conn = &*db;
         use schema::users::dsl::*;
-        let user_profile: QueryResult<User> = users.filter(user.eq(username.to_owned())).get_result(conn);
+        let user_profile: QueryResult<UserEntry> = users.filter(user.eq(username.to_owned())).get_result(conn);
         match user_profile {
             Ok(user_data) => return user_data.verify(pass),
             Err(_) => return false,

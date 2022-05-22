@@ -1,8 +1,11 @@
 const LOGIN_URL = "/auth/login"
 const REGISTER_URL = "/auth/register"
+const GET_USER_NAME_URL = "/auth/"
 
 const STATE = {
 }
+
+function get_user_name() { }
 
 function login(username: string, password: string) {
     fetch(
@@ -41,7 +44,7 @@ function registerGuest(username: string) {
     )
         .then(resp => resp.json())
         .then((json_data) => {
-            if ("None" in json_data) { "Guest username already taken" } else { setToken(json_data["Some"]) }
+            if (!json_data) { alert('To be fixed') } else { setToken(json_data) }
         })
         .catch(alert)
 }
@@ -146,5 +149,12 @@ class Subscribtion {
 }
 
 window.addEventListener('load', () => {
-
+    setButton('register_guest', (_: any) => {
+        let guest_username = document.getElementById('guest') as HTMLInputElement | null
+        console.log(guest_username)
+        if (guest_username) {
+            console.log(guest_username.value)
+            registerGuest(guest_username.value)
+        }
+    })
 })

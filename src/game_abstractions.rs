@@ -21,7 +21,18 @@ pub enum PlayerMove {
     QuoridorWallV((usize, usize), String),
     QuoridorWallH((usize, usize), String),
     QuoridorMove((usize, usize), String),
-    ChessMove((usize, usize), (usize, usize)), // ((from)=>(to))
+    ChessMove((usize, usize), (usize, usize), String), // ((from)=>(to))
+}
+
+impl PlayerMove {
+    pub fn confirm_player(&self, player: &String) -> bool {
+        match self {
+            Self::QuoridorWallH(_, move_player) => player == move_player,
+            Self::QuoridorWallV(_, move_player) => player == move_player,
+            Self::QuoridorMove(_, move_player) => player == move_player,
+            Self::ChessMove(_, _, move_player) => player == move_player,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -31,6 +42,7 @@ pub enum PlayerMoveResult {
     WrongPlayer,
     Unallowed,
     Unknown,
+    Unauthorized,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]

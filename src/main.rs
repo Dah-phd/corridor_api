@@ -2,7 +2,7 @@
 extern crate rocket;
 use rocket::serde::{Deserialize, Serialize};
 mod game_abstractions;
-use game_abstractions::{ActiveMatchs, Match, MatchRooms, MatchType, PlayerMove, PlayerMoveResult, Room};
+use game_abstractions::{ActiveMatchs, GameMatch, Match, MatchRooms, MatchType, PlayerMove, PlayerMoveResult, Room};
 mod auth;
 mod messages;
 use messages::{ChatID, Messages};
@@ -116,9 +116,9 @@ async fn room_chat(
 }
 
 #[get("/room_events/<owner>")]
-async fn room_events<'a>(
+async fn room_events(
     owner: String,
-    queue: &'a rocket::State<rocket::tokio::sync::broadcast::Sender<Room>>,
+    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Room>>,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
     let mut rx = queue.subscribe();
@@ -143,8 +143,12 @@ fn make_move(
     owner: String,
     player_move: rocket::serde::json::Json<PlayerMove>,
     sessions: &rocket::State<ActiveMatchs>,
+    token: auth::Token,
     queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Match>>,
 ) -> rocket::serde::json::Json<PlayerMoveResult> {
+    if !player_move.confirm_player(&token.user) {
+        return rocket::serde::json::Json(PlayerMoveResult::Unauthorized);
+    }
     let move_result: PlayerMoveResult = match sessions.make_move(&owner, player_move.into_inner()) {
         Some(v) => v,
         None => return rocket::serde::json::Json(PlayerMoveResult::Unknown),
@@ -156,7 +160,7 @@ fn make_move(
 }
 
 #[get("/state/<owner>")]
-fn get_state(owner: String, active_sessions: &rocket::State<ActiveMatchs>) -> rocket::serde::json::Json<Match> {
+fn get_game_state_by_owner(owner: String, active_sessions: &rocket::State<ActiveMatchs>) -> rocket::serde::json::Json<Match> {
     let session_state = active_sessions.get_match(&owner);
     match session_state {
         None => rocket::serde::json::Json(Match::NotFound),
@@ -165,9 +169,9 @@ fn get_state(owner: String, active_sessions: &rocket::State<ActiveMatchs>) -> ro
 }
 
 #[get("/events/<owner>")]
-async fn events<'a>(
+async fn match_events(
     owner: String,
-    queue: &'a rocket::State<rocket::tokio::sync::broadcast::Sender<Match>>,
+    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Match>>,
     toket: auth::Token,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
@@ -210,19 +214,31 @@ async fn session_chat(
     }
 }
 
+#[get("/quoridor-test")]
+fn test_quoridor_board() -> rocket::serde::json::Json<Match> {
+    let pl_ls = vec!["a".to_owned(), "b".to_owned()];
+    let mut quoridor = quoridor::QuoridorMatch::new(&pl_ls, "a".to_owned());
+    quoridor.make_move(PlayerMove::QuoridorWallH((2, 2), "a".to_owned()));
+    quoridor.make_move(PlayerMove::QuoridorWallV((5, 5), "b".to_owned()));
+    quoridor.make_move(PlayerMove::QuoridorMove((1, 4), "a".to_owned()));
+    return rocket::serde::json::Json(Match::ActiveQuoridor(quoridor));
+}
+
 #[launch]
 fn rocket() -> _ {
     rocket::build()
         .mount(
             "/",
             routes![
+                test_quoridor_board,
                 auth::login,
                 auth::register,
+                auth::get_user_name_from_token,
                 post_message,
                 make_move,
                 session_chat,
-                events,
-                get_state,
+                match_events,
+                get_game_state_by_owner,
                 room_to_session,
                 get_all_rooms,
                 join_room,

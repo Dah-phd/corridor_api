@@ -11,7 +11,7 @@ fn default_player_status() -> bool {
 #[serde(crate = "rocket::serde")]
 #[derive(Queryable, Insertable)]
 #[table_name = "users"]
-pub struct User {
+pub struct UserEntry {
     pub user: String,
     pub password: String,
     pub email: String,
@@ -19,7 +19,7 @@ pub struct User {
     pub active: bool,
 }
 
-impl User {
+impl UserEntry {
     pub fn verify(&self, password: &str) -> bool {
         pwhash::bcrypt::verify(password, &self.password)
     }
