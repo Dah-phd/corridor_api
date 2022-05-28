@@ -1,5 +1,6 @@
 extern crate rocket;
 use crate::game_abstractions::{GameMatch, PlayerMove, PlayerMoveResult};
+mod a_star;
 use rocket::serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
