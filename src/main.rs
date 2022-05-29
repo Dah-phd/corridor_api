@@ -3,6 +3,7 @@ extern crate rocket;
 use rocket::serde::{Deserialize, Serialize};
 mod game_abstractions;
 use game_abstractions::{ActiveMatchs, GameMatch, Match, MatchRooms, MatchType, PlayerMove, PlayerMoveResult, Room};
+mod a_star_generic;
 mod auth;
 mod messages;
 use messages::{ChatID, Messages};
