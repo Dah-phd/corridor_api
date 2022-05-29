@@ -226,6 +226,13 @@ fn test_quoridor_board() -> rocket::serde::json::Json<Match> {
 
 #[launch]
 fn rocket() -> _ {
+    let mut new_game = quoridor::Quoridor::new();
+    new_game.new_h_wall((1, 2));
+    new_game.new_h_wall((1, 4));
+    new_game.new_v_wall((2, 5));
+    quoridor::print_state(&new_game);
+    println!("{:?}", new_game.get_shortest_path(new_game.up_player, 8));
+
     rocket::build()
         .mount(
             "/",

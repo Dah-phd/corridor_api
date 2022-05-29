@@ -14,15 +14,15 @@ enum NextNodeResult<T> {
 pub struct AStar {
     target: (Option<usize>, Option<usize>),
     que: Vec<Node>,
-    closed: Vec<Node>,
+    closed_nodes: Vec<Node>,
 }
 
 impl AStar {
-    pub fn new(target: (Option<usize>, Option<usize>)) -> Self {
+    fn new(target: (Option<usize>, Option<usize>)) -> Self {
         Self {
             target,
             que: Vec::new(),
-            closed: Vec::new(),
+            closed_nodes: Vec::new(),
         }
     }
 
@@ -59,7 +59,7 @@ impl AStar {
                     }
                 }
             }
-            inst.closed.push(top);
+            inst.closed_nodes.push(top);
         }
     }
 
@@ -74,14 +74,12 @@ impl AStar {
             return NextNodeResult::Finished;
         }
         let new_cost = cost + old_node.cost;
-        let new_node = Node {
+        NextNodeResult::Ok(Node {
             position: new_position,
             comes_from: Some(old_node.position),
             cost: new_cost,
             heuristic_cost: heuristic_cost + new_cost,
-        };
-
-        NextNodeResult::Ok(new_node)
+        })
     }
 
     fn target_is_reached(&self, node: &Node) -> bool {
@@ -109,13 +107,13 @@ impl AStar {
 
     fn pull_previous_position(&self, node: &Node) -> Option<&Node> {
         if node.comes_from.is_some() {
-            let result = self.pull_from_closed_by_position(node.comes_from.unwrap());
+            return self.pull_from_closed_by_position(node.comes_from.unwrap());
         }
         None
     }
 
     fn pull_from_closed_by_position(&self, position: (usize, usize)) -> Option<&Node> {
-        for closed_node in self.closed.iter() {
+        for closed_node in self.closed_nodes.iter() {
             if closed_node.position == position {
                 return Some(closed_node);
             }

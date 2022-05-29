@@ -164,16 +164,28 @@ impl Quoridor {
     fn build_possible_paths(&self, from_position: (usize, usize)) -> Vec<(usize, usize)> {
         let mut possible_paths = vec![];
         if from_position.0 > 0 {
-            possible_paths.push((from_position.0 - 1, from_position.1));
+            let new_position = (from_position.0 - 1, from_position.1);
+            if !self.is_move_blocked_by_wall_or_wrong(from_position, new_position) {
+                possible_paths.push(new_position);
+            }
         }
         if from_position.1 < 8 {
-            possible_paths.push((from_position.0, from_position.1 + 1));
+            let new_position = (from_position.0, from_position.1 + 1);
+            if !self.is_move_blocked_by_wall_or_wrong(from_position, new_position) {
+                possible_paths.push(new_position);
+            }
         }
         if from_position.0 < 8 {
-            possible_paths.push((from_position.0 + 1, from_position.1))
+            let new_position = (from_position.0 + 1, from_position.1);
+            if !self.is_move_blocked_by_wall_or_wrong(from_position, new_position) {
+                possible_paths.push(new_position);
+            }
         }
         if from_position.1 > 0 {
-            possible_paths.push((from_position.0, from_position.1 - 1));
+            let new_position = (from_position.0, from_position.1 - 1);
+            if !self.is_move_blocked_by_wall_or_wrong(from_position, new_position) {
+                possible_paths.push(new_position);
+            }
         }
         return possible_paths;
     }
@@ -209,7 +221,11 @@ impl a_star::PathGenerator for Quoridor {
         self.build_possible_paths(from_position)
     }
     fn calculate_heuristic_cost(&self, position: (usize, usize), target: (Option<usize>, Option<usize>)) -> usize {
-        todo!()
+        let target_row = target.0.unwrap();
+        if position.0 > target_row {
+            return position.0 - target_row;
+        }
+        target_row - position.0
     }
     fn calculate_cost(&self, current_position: (usize, usize), next_position: (usize, usize)) -> usize {
         1
@@ -217,9 +233,9 @@ impl a_star::PathGenerator for Quoridor {
 }
 
 impl Quoridor {
-    fn get_shortest_path(&self, player: (usize, usize), target: usize) {
+    pub fn get_shortest_path(&self, player: (usize, usize), target: usize) -> Result<Vec<(usize, usize)>, String> {
         use a_star::AStar;
-        let fastest_path = AStar::run(Box::new(self), player, (Some(target), None));
+        return AStar::run(Box::new(self), player, (Some(target), None));
     }
 }
 
