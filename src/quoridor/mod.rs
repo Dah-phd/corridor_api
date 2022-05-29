@@ -208,13 +208,18 @@ impl a_star::PathGenerator for Quoridor {
     fn generate_paths(&self, from_position: (usize, usize)) -> Vec<(usize, usize)> {
         self.build_possible_paths(from_position)
     }
+    fn calculate_heuristic_cost(&self, position: (usize, usize), target: (Option<usize>, Option<usize>)) -> usize {
+        todo!()
+    }
+    fn calculate_cost(&self, current_position: (usize, usize), next_position: (usize, usize)) -> usize {
+        1
+    }
 }
 
 impl Quoridor {
     fn get_shortest_path(&self, player: (usize, usize), target: usize) {
         use a_star::AStar;
-        let mut path_finder = AStar::new(player, target);
-        let fastest_path = path_finder.run(Box::new(self));
+        let fastest_path = AStar::run(Box::new(self), player, (Some(target), None));
     }
 }
 
