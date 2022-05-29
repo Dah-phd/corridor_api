@@ -233,7 +233,7 @@ impl a_star_generic::PathGenerator for Quoridor {
 }
 
 impl Quoridor {
-    pub fn get_shortest_path(&self, player: (usize, usize), target: usize) -> Result<Vec<(usize, usize)>, String> {
+    pub fn get_shortest_path(&self, player: (usize, usize), target: usize) -> Option<Vec<(usize, usize)>> {
         return a_star_generic::AStar::run(Box::new(self), player, (Some(target), None));
     }
 }

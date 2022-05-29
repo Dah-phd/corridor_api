@@ -1,3 +1,5 @@
+// generic implementation of pathfinid algorithm
+// current users: Quoridor
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 
 pub trait PathGenerator {
@@ -30,7 +32,7 @@ impl AStar {
         from_struct: Box<&T>,
         start: (usize, usize),
         target: (Option<usize>, Option<usize>),
-    ) -> Result<Vec<(usize, usize)>, String> {
+    ) -> Option<Vec<(usize, usize)>> {
         // PathGenerator is used to build possible paths
         let mut inst = Self::new(target);
         let exposed_struct = *from_struct;
@@ -38,7 +40,7 @@ impl AStar {
             .push(Node::new(start, exposed_struct.calculate_heuristic_cost(start, target)));
         loop {
             if inst.que.is_empty() {
-                return Err("no path found".to_owned()); // no elements left therefor no fast way out
+                return None; // no elements left therefor no fast way out
             }
             inst.que.sort();
             let top = inst.que.remove(0);
@@ -55,7 +57,7 @@ impl AStar {
                         exposed_struct.calculate_heuristic_cost(possible_path, inst.target),
                     ) {
                         NextNodeResult::Ok(v) => inst.que.push(v),
-                        NextNodeResult::Finished => return Ok(inst.reconstruct_path(top)),
+                        NextNodeResult::Finished => return Some(inst.reconstruct_path(top)),
                     }
                 }
             }

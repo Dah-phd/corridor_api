@@ -20,7 +20,7 @@ pub enum User {
 pub enum UserResult<T> {
     Ok(T),
     PlayerExists,
-    NameTooLong,
+    NameTooShort,
     UnsupportedSymbol,
     UserNotFound,
 }
@@ -40,14 +40,24 @@ impl<T> UserResult<T> {
     }
 }
 
-fn is_name_too_long(name: &String) -> bool {
+fn get_naming_errors<T>(name: &String) -> Option<UserResult<T>> {
+    if name_is_using_unsupported_symbols(name) {
+        return Some(UserResult::UnsupportedSymbol);
+    }
+    if name_is_too_short(name) {
+        return Some(UserResult::NameTooShort);
+    }
+    None
+}
+
+fn name_is_too_short(name: &String) -> bool {
     if name.len() < 4 {
         return true;
     }
     false
 }
 
-fn is_name_using_unsupported_symbols(name: &String) -> bool {
+fn name_is_using_unsupported_symbols(name: &String) -> bool {
     let arr = ["|"];
     for symbol in arr {
         if name.contains(symbol) {
@@ -61,20 +71,16 @@ impl User {
     pub fn update_guest_name(self) -> UserResult<Self> {
         match self {
             Self::User(name, pass) => {
-                if is_name_too_long(&name) {
-                    return UserResult::NameTooLong;
-                }
-                if is_name_using_unsupported_symbols(&name) {
-                    return UserResult::UnsupportedSymbol;
+                let name_err = get_naming_errors(&name);
+                if name_err.is_some() {
+                    return name_err.unwrap();
                 }
                 return UserResult::Ok(Self::User(name, pass));
             }
             Self::Guest(name) => {
-                if is_name_too_long(&name) {
-                    return UserResult::NameTooLong;
-                }
-                if is_name_using_unsupported_symbols(&name) {
-                    return UserResult::UnsupportedSymbol;
+                let name_err = get_naming_errors(&name);
+                if name_err.is_some() {
+                    return name_err.unwrap();
                 }
                 return UserResult::Ok(Self::Guest(name + "|"));
             }
