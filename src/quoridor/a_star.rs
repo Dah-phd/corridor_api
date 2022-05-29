@@ -1,37 +1,46 @@
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 
+pub trait PathGenerator {
+    fn generate_paths(&self, from_position: (usize, usize)) -> Vec<(usize, usize)>;
+}
+
 enum NextNodeResult<T> {
     Ok(T),
     Finished,
     Err,
 }
 
-struct AstarQue {
-    max_xy_coordinates: (usize, usize),
+pub struct AStar {
     que: Vec<Node>,
     closed: Vec<Node>,
 }
 
-impl AstarQue {
-    pub fn new(start: (usize, usize), target: usize, max_xy_coordinates: (usize, usize)) -> Self {
+impl AStar {
+    pub fn new(start: (usize, usize), target: usize) -> Self {
         Self {
-            max_xy_coordinates,
             que: vec![Node::new(start, target)],
             closed: Vec::new(),
         }
     }
 
-    pub fn run(&mut self, validator: fn((usize, usize), (usize, usize)) -> bool) -> Result<Vec<(usize, usize)>, ()> {
+    pub fn run<T: PathGenerator>(&mut self, from_struct: Box<&T>) -> Result<Vec<(usize, usize)>, String> {
         // validators confirms that the move is possible
+        let exposed_struct = *from_struct;
         loop {
+            if self.que.is_empty() {
+                return Err("no path found".to_owned()); // no elements left therefor no fast way out
+            }
             self.que.sort();
             let top = self.que.remove(0);
-            let possible_paths = Self::get_all_directions(&top);
+            let possible_paths = exposed_struct.generate_paths(top.position);
             if possible_paths.len() != 0 {
                 for possible_path in possible_paths {
+                    if self.pull_from_closed_by_position(possible_path).is_some() {
+                        continue;
+                    }
                     match top.next_node(possible_path) {
                         NextNodeResult::Ok(v) => self.que.push(v),
-                        NextNodeResult::Err => return Result::Err(()),
+                        NextNodeResult::Err => return Result::Err("Impossible path passed!".to_owned()),
                         NextNodeResult::Finished => return Ok(self.reconstruct_path(top)),
                     }
                 }
@@ -40,32 +49,33 @@ impl AstarQue {
         }
     }
 
-    fn get_all_directions(from_node: &Node) -> Vec<(usize, usize)> {
-        let result = Vec::new();
-        if from_node.position.0 != 0 {}
-        if from_node.position.1 != 0 {}
-        result
-    }
-
     fn reconstruct_path(&self, opt: Node) -> Vec<(usize, usize)> {
         let mut fastest_path = vec![opt.position];
         let mut opt = self.pull_previous_position(&opt);
         loop {
-            fastest_path.push(opt.position);
-            if opt.comes_from.is_none() {
+            if opt.is_some() {
+                fastest_path.push(opt.unwrap().position);
+            } else {
                 return fastest_path;
             }
-            opt = self.pull_previous_position(opt);
+            opt = self.pull_previous_position(opt.unwrap());
         }
     }
 
-    fn pull_previous_position(&self, node: &Node) -> &Node {
+    fn pull_previous_position(&self, node: &Node) -> Option<&Node> {
+        if node.comes_from.is_some() {
+            let result = self.pull_from_closed_by_position(node.comes_from.unwrap());
+        }
+        None
+    }
+
+    fn pull_from_closed_by_position(&self, position: (usize, usize)) -> Option<&Node> {
         for closed_node in self.closed.iter() {
-            if closed_node.position == node.comes_from.unwrap() {
-                return closed_node;
+            if closed_node.position == position {
+                return Some(closed_node);
             }
         }
-        panic!("MISSING NODE IN CLOSED QUE VEC!")
+        None
     }
 }
 

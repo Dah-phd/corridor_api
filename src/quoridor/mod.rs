@@ -161,6 +161,23 @@ impl Quoridor {
         true
     }
 
+    fn build_possible_paths(&self, from_position: (usize, usize)) -> Vec<(usize, usize)> {
+        let mut possible_paths = vec![];
+        if from_position.0 > 0 {
+            possible_paths.push((from_position.0 - 1, from_position.1));
+        }
+        if from_position.1 < 8 {
+            possible_paths.push((from_position.0, from_position.1 + 1));
+        }
+        if from_position.0 < 8 {
+            possible_paths.push((from_position.0 + 1, from_position.1))
+        }
+        if from_position.1 > 0 {
+            possible_paths.push((from_position.0, from_position.1 - 1));
+        }
+        return possible_paths;
+    }
+
     fn player_can_win(
         &self,
         start_position: (usize, usize),
@@ -171,19 +188,7 @@ impl Quoridor {
         if target_coordinate == 0 && start_position.0 == target || target_coordinate == 1 && start_position.1 == target {
             return true;
         } else {
-            let mut possible_paths = vec![];
-            if start_position.0 > 0 {
-                possible_paths.push((start_position.0 - 1, start_position.1));
-            }
-            if start_position.1 < 8 {
-                possible_paths.push((start_position.0, start_position.1 + 1));
-            }
-            if start_position.0 < 8 {
-                possible_paths.push((start_position.0 + 1, start_position.1))
-            }
-            if start_position.1 > 0 {
-                possible_paths.push((start_position.0, start_position.1 - 1));
-            }
+            let possible_paths = self.build_possible_paths(start_position);
             for possible_path in possible_paths {
                 if !past_position.contains(&possible_path)
                     && !self.is_move_blocked_by_wall_or_wrong(start_position, possible_path)
@@ -196,6 +201,20 @@ impl Quoridor {
             }
         }
         false
+    }
+}
+
+impl a_star::PathGenerator for Quoridor {
+    fn generate_paths(&self, from_position: (usize, usize)) -> Vec<(usize, usize)> {
+        self.build_possible_paths(from_position)
+    }
+}
+
+impl Quoridor {
+    fn get_shortest_path(&self, player: (usize, usize), target: usize) {
+        use a_star::AStar;
+        let mut path_finder = AStar::new(player, target);
+        let fastest_path = path_finder.run(Box::new(self));
     }
 }
 
