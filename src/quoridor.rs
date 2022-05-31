@@ -1,5 +1,5 @@
 extern crate rocket;
-use crate::a_star_generic;
+use crate::a_star_generic_safe;
 use crate::game_abstractions::{GameMatch, PlayerMove, PlayerMoveResult};
 use rocket::serde::{Deserialize, Serialize};
 
@@ -216,7 +216,7 @@ impl Quoridor {
     }
 }
 
-impl a_star_generic::PathGenerator for Quoridor {
+impl a_star_generic_safe::PathGenerator for Quoridor {
     fn generate_paths(&self, from_position: (usize, usize)) -> Vec<(usize, usize)> {
         self.build_possible_paths(from_position)
     }
@@ -234,7 +234,7 @@ impl a_star_generic::PathGenerator for Quoridor {
 
 impl Quoridor {
     pub fn get_shortest_path(&self, player: (usize, usize), target: usize) -> Option<Vec<(usize, usize)>> {
-        return a_star_generic::AStar::run(Box::new(self), player, (Some(target), None));
+        return a_star_generic_safe::AStar::run(Box::new(self), player, (Some(target), None));
     }
 }
 

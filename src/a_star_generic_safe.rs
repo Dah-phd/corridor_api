@@ -1,7 +1,6 @@
 // generic implementation of pathfinid algorithm
 // current users: Quoridor
 use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
-use std::rc::Rc;
 
 pub trait PathGenerator {
     fn generate_paths(&self, from_position: (usize, usize)) -> Vec<(usize, usize)>;
@@ -17,7 +16,7 @@ enum NextNodeResult<T> {
 pub struct AStar {
     target: (Option<usize>, Option<usize>),
     que: Vec<Node>,
-    closed_nodes: Vec<Rc<Node>>,
+    closed_nodes: Vec<Node>,
 }
 
 impl AStar {
@@ -44,7 +43,7 @@ impl AStar {
                 return None; // no elements left therefor no fast way out
             }
             inst.que.sort();
-            let top = Rc::new(inst.que.remove(0));
+            let top = inst.que.remove(0);
             let possible_paths = exposed_struct.generate_paths(top.position);
             if possible_paths.len() != 0 {
                 for possible_path in possible_paths {
@@ -52,34 +51,34 @@ impl AStar {
                         continue;
                     }
                     match inst.create_new_node(
-                        Rc::clone(&top),
+                        &top,
                         possible_path,
                         exposed_struct.calculate_cost(top.position, possible_path),
                         exposed_struct.calculate_heuristic_cost(possible_path, inst.target),
                     ) {
                         NextNodeResult::Ok(v) => inst.que.push(v),
-                        NextNodeResult::Finished => return Some(inst.reconstruct_path(Rc::clone(&top))),
+                        NextNodeResult::Finished => return Some(inst.reconstruct_path(top)),
                     }
                 }
             }
-            inst.closed_nodes.push(Rc::clone(&top));
+            inst.closed_nodes.push(top);
         }
     }
 
     fn create_new_node(
         &self,
-        old_node: Rc<Node>,
+        old_node: &Node,
         new_position: (usize, usize),
         cost: usize,
         heuristic_cost: usize,
     ) -> NextNodeResult<Node> {
-        if self.target_is_reached(&*old_node) {
+        if self.target_is_reached(old_node) {
             return NextNodeResult::Finished;
         }
         let new_cost = cost + old_node.cost;
         NextNodeResult::Ok(Node {
             position: new_position,
-            comes_from: Some(old_node),
+            comes_from: Some(old_node.position),
             cost: new_cost,
             heuristic_cost: heuristic_cost + new_cost,
         })
@@ -95,17 +94,24 @@ impl AStar {
         true
     }
 
-    fn reconstruct_path(&self, opt: Rc<Node>) -> Vec<(usize, usize)> {
+    fn reconstruct_path(&self, opt: Node) -> Vec<(usize, usize)> {
         let mut fastest_path = vec![opt.position];
-        let mut comes_from = opt.comes_from.as_ref();
+        let mut opt = self.pull_previous_position(&opt);
         loop {
-            if comes_from.is_some() {
-                fastest_path.push(comes_from.unwrap().position);
+            if opt.is_some() {
+                fastest_path.push(opt.unwrap().position);
             } else {
                 return fastest_path;
             }
-            comes_from = comes_from.unwrap().comes_from.as_ref();
+            opt = self.pull_previous_position(opt.unwrap());
         }
+    }
+
+    fn pull_previous_position(&self, node: &Node) -> Option<&Node> {
+        if node.comes_from.is_some() {
+            return self.pull_from_closed_by_position(node.comes_from.unwrap());
+        }
+        None
     }
 
     fn pull_from_closed_by_position(&self, position: (usize, usize)) -> Option<&Node> {
@@ -121,7 +127,7 @@ impl AStar {
 #[derive(Eq)]
 struct Node {
     position: (usize, usize),
-    comes_from: Option<Rc<Node>>,
+    comes_from: Option<(usize, usize)>,
     cost: usize,
     heuristic_cost: usize,
 }
@@ -130,7 +136,7 @@ impl Node {
     fn new(position: (usize, usize), heuristic_cost: usize) -> Self {
         Self {
             position,
-            comes_from: None,
+            comes_from: Option::None,
             cost: 0,
             heuristic_cost,
         }

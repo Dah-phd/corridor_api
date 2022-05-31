@@ -3,7 +3,7 @@ extern crate rocket;
 use rocket::serde::{Deserialize, Serialize};
 mod game_abstractions;
 use game_abstractions::{ActiveMatchs, GameMatch, Match, MatchRooms, MatchType, PlayerMove, PlayerMoveResult, Room};
-mod a_star_generic;
+mod a_star_generic_safe;
 mod auth;
 mod messages;
 use messages::{ChatID, Messages};
@@ -225,15 +225,32 @@ fn test_quoridor_board() -> rocket::serde::json::Json<Match> {
     return rocket::serde::json::Json(Match::ActiveQuoridor(quoridor));
 }
 
-#[launch]
-fn rocket() -> _ {
+fn test_a_star_with_path() {
     let mut new_game = quoridor::Quoridor::new();
     new_game.new_h_wall((1, 2));
     new_game.new_h_wall((1, 4));
     new_game.new_v_wall((2, 5));
     quoridor::print_state(&new_game);
     println!("{:?}", new_game.get_shortest_path(new_game.up_player, 8));
+}
 
+fn test_a_star_with_no_path() {
+    let mut new_game = quoridor::Quoridor::new();
+    new_game.new_h_wall((1, 0));
+    new_game.new_h_wall((1, 2));
+    new_game.new_h_wall((1, 4));
+    new_game.new_h_wall((1, 6));
+    new_game.new_h_wall((1, 6));
+    new_game.new_v_wall((2, 6));
+    new_game.new_h_wall((3, 7));
+    quoridor::print_state(&new_game);
+    println!("{:?}", new_game.get_shortest_path(new_game.up_player, 8));
+}
+
+#[launch]
+fn rocket() -> _ {
+    test_a_star_with_path();
+    test_a_star_with_no_path();
     rocket::build()
         .mount(
             "/",
