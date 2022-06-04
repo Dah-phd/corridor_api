@@ -78,10 +78,7 @@ impl Quoridor {
                 return false;
             }
         }
-        if self.vertical_walls.contains(&new_wall) {
-            return false;
-        }
-        true
+        !self.vertical_walls.contains(&new_wall)
     }
 
     pub fn new_v_wall(&mut self, wall: (usize, usize)) -> bool {
@@ -111,10 +108,7 @@ impl Quoridor {
                 return false;
             }
         }
-        if self.horizontal_walls.contains(&new_wall) {
-            return false;
-        }
-        true
+        !self.horizontal_walls.contains(&new_wall)
     }
 
     fn is_move_blocked_by_wall_or_wrong(&self, start_position: (usize, usize), possible_path: (usize, usize)) -> bool {
@@ -226,39 +220,35 @@ pub struct QuoridorMatch {
 }
 
 impl QuoridorMatch {
-    pub fn new_h_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
-        let player_status = self.player_is_valid(player);
-        match player_status {
-            PlayerMoveResult::Ok => (),
-            _ => return player_status,
-        }
-        if self.only_player_moves_allowed || !self.game.new_h_wall(position) {
-            return PlayerMoveResult::Unallowed;
-        };
+    fn remove_border_from_player(&mut self, player: &str) {
         if player == self.up_player {
             self.game.up_player_free_walls -= 1
         } else {
             self.game.down_player_free_walls -= 1
         }
-        self.switch_players_and_trigger_cpu_move();
+    }
+
+    pub fn new_h_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
+        let player_status = self.player_is_valid(player);
+        if !player_status.is_ok() {
+            return player_status;
+        }
+        if self.only_player_moves_allowed || !self.game.new_h_wall(position) {
+            return PlayerMoveResult::Unallowed;
+        };
+        self.remove_border_from_player(player);
         player_status
     }
 
     pub fn new_v_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
         let player_status = self.player_is_valid(player);
-        match player_status {
-            PlayerMoveResult::Ok => (),
-            _ => return player_status,
+        if !player_status.is_ok() {
+            return player_status;
         }
         if self.only_player_moves_allowed || !self.game.new_v_wall(position) {
             return PlayerMoveResult::Unallowed;
         }
-        if player == self.up_player {
-            self.game.up_player_free_walls -= 1
-        } else {
-            self.game.down_player_free_walls -= 1
-        }
-        self.switch_players_and_trigger_cpu_move();
+        self.remove_border_from_player(player);
         player_status
     }
 
@@ -274,20 +264,23 @@ impl QuoridorMatch {
         PlayerMoveResult::Ok
     }
 
-    fn switch_players_and_trigger_cpu_move(&mut self) {
+    fn next_player(&mut self) {
+        if self.game.up_player == self.game.down_player {
+            self.only_player_moves_allowed = true;
+            return;
+        }
         if self.game.up_player != self.game.down_player {
             if self.current == self.up_player {
                 self.current = self.down_player.to_owned();
             } else {
                 self.current = self.up_player.to_owned()
             }
-        } else {
-            self.only_player_moves_allowed = true
         }
-        if self.current == cpu::CPU {
-            let cpu_move = cpu::CpuPlayer::get_cpu_move(&self.game, self.only_player_moves_allowed);
-            self.make_move(cpu_move);
-        }
+    }
+
+    fn maybe_trigger_cpu_player(&mut self) {
+        let cpu_move = cpu::CpuPlayer::get_cpu_move(&self.game, self.only_player_moves_allowed);
+        self.make_move(cpu_move);
     }
 }
 
@@ -319,7 +312,6 @@ impl GameMatch for QuoridorMatch {
             return PlayerMoveResult::Unallowed;
         }
         self.only_player_moves_allowed = false;
-        self.switch_players_and_trigger_cpu_move();
         PlayerMoveResult::Ok
     }
 
@@ -328,19 +320,21 @@ impl GameMatch for QuoridorMatch {
     }
 
     fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult {
-        match player_move {
+        let result = match player_move {
             PlayerMove::QuoridorWallH(val, player) => self.new_h_wall(&player, val),
             PlayerMove::QuoridorWallV(val, player) => self.new_v_wall(&player, val),
             PlayerMove::QuoridorMove(val, player) => self.move_player(&player, val, ()),
             _ => PlayerMoveResult::Unknown,
-        }
+        };
+        if result.is_ok() {
+            self.next_player();
+            self.maybe_trigger_cpu_player();
+        };
+        result
     }
 
     fn contains_player(&self, player: &str) -> bool {
-        if self.up_player == player || self.down_player == player {
-            return true;
-        }
-        false
+        self.up_player == player || self.down_player == player
     }
 }
 

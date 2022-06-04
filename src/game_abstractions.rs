@@ -42,6 +42,14 @@ pub enum PlayerMoveResult {
     Unknown,
     Unauthorized,
 }
+impl PlayerMoveResult {
+    pub fn is_ok(&self) -> bool {
+        if let Self::Ok = self {
+            return true;
+        }
+        false
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy)]
 #[serde(crate = "rocket::serde")]
@@ -70,7 +78,7 @@ impl Match {
         }
     }
 
-    pub fn expose(&mut self) -> &mut QuoridorMatch {
+    pub fn unwrap(&mut self) -> &mut QuoridorMatch {
         match self {
             Match::ActiveQuoridor(v) => v,
             _ => panic!("NotFound method called!"),
@@ -180,20 +188,18 @@ impl ActiveMatchs {
         let mut matchs_list = self.matchs.lock().unwrap();
         let exposed_vector = &mut *matchs_list;
         let new_match = Match::new(player_list, player_list[0].to_owned(), match_type);
-        match new_match {
-            Some(match_) => {
-                exposed_vector.push(match_);
-                true
-            }
-            None => false,
+        if new_match.is_none() {
+            return false;
         }
+        exposed_vector.push(new_match.unwrap());
+        true
     }
 
     pub fn get_match(&self, player: &String) -> Option<Match> {
         let mut matchs_list = self.matchs.lock().unwrap();
         let exposed_vector = &mut *matchs_list;
         for match_ in exposed_vector {
-            if match_.expose().contains_player(player) {
+            if match_.unwrap().contains_player(player) {
                 return Some(match_.clone());
             }
         }
@@ -215,7 +221,7 @@ impl ActiveMatchs {
         let mut matchs_list = self.matchs.lock().unwrap();
         let exposed_vector = &mut *matchs_list;
         for match_ in exposed_vector {
-            let exposed_match = match_.expose();
+            let exposed_match = match_.unwrap();
             if exposed_match.owner == *owner {
                 return Some(exposed_match.make_move(player_move));
             }

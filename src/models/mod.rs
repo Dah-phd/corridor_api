@@ -54,9 +54,9 @@ impl UserModel {
         let conn = &*db;
         use schema::users::dsl::*;
         let user_profile: QueryResult<UserEntry> = users.filter(user.eq(username.to_owned())).get_result(conn);
-        match user_profile {
-            Ok(user_data) => return user_data.verify(pass),
-            Err(_) => return false,
+        if user_profile.is_err() {
+            return false;
         }
+        return user_profile.unwrap().verify(pass);
     }
 }

@@ -3,12 +3,9 @@ use std::collections::HashMap;
 pub const CPU: &str = "|CPU|";
 
 pub struct CpuPlayer {
-    difficulty: f32,
     game: Quoridor,
     cpu_path: Vec<(usize, usize)>,
     player_path: Vec<(usize, usize)>,
-    tested_v_walls: Vec<(usize, usize)>,
-    tested_h_walls: Vec<(usize, usize)>,
 }
 
 impl CpuPlayer {
@@ -31,27 +28,24 @@ impl CpuPlayer {
 
     fn new(game: Quoridor) -> Self {
         Self {
-            difficulty: 1.0,
             cpu_path: game.get_shortest_path(game.down_player, 0).unwrap(),
             player_path: game.get_shortest_path(game.up_player, 8).unwrap(),
             game,
-            tested_v_walls: Vec::new(),
-            tested_h_walls: Vec::new(),
         }
     }
 
     fn can_enemy_jump_over_cpu(&self, position: (usize, usize)) -> bool {
-        let total_position_player = self.game.up_player.0 + self.game.up_player.1;
-        let total_position_cpu = position.0 + position.1;
-        let difference = if total_position_cpu > total_position_player {
-            total_position_cpu - total_position_player
+        self.get_difference_between_total_positions(position, self.game.up_player) == 1
+    }
+
+    fn get_difference_between_total_positions(&self, position_x: (usize, usize), position_y: (usize, usize)) -> usize {
+        let x = position_x.0 + position_x.1;
+        let y = position_y.0 + position_y.1;
+        if x > y {
+            x - y
         } else {
-            total_position_player - total_position_cpu
-        };
-        if difference == 1 {
-            return true;
+            y - x
         }
-        false
     }
 
     fn get_best_wall(&mut self) -> Option<PlayerMove> {
