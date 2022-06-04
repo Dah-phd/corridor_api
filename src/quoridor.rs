@@ -58,9 +58,7 @@ impl Quoridor {
             return false;
         }
         self.horizontal_walls.push(wall);
-        if self.player_can_win(self.up_player, &mut Vec::new(), 8, 0)
-            && self.player_can_win(self.down_player, &mut Vec::new(), 0, 0)
-        {
+        if self.player_can_win(self.up_player, 8) && self.player_can_win(self.down_player, 0) {
             return true;
         }
         self.horizontal_walls.pop();
@@ -93,9 +91,7 @@ impl Quoridor {
             return false;
         }
         self.vertcal_walls.push(wall);
-        if self.player_can_win(self.up_player, &mut Vec::new(), 8, 0)
-            && self.player_can_win(self.down_player, &mut Vec::new(), 0, 0)
-        {
+        if self.player_can_win(self.up_player, 8) && self.player_can_win(self.down_player, 0) {
             return true;
         }
         self.vertcal_walls.pop();
@@ -190,29 +186,12 @@ impl Quoridor {
         return possible_paths;
     }
 
-    fn player_can_win(
-        &self,
-        start_position: (usize, usize),
-        past_position: &mut Vec<(usize, usize)>,
-        target: usize,
-        target_coordinate: usize, // 0 for row 1 for column
-    ) -> bool {
-        if target_coordinate == 0 && start_position.0 == target || target_coordinate == 1 && start_position.1 == target {
-            return true;
-        } else {
-            let possible_paths = self.build_possible_paths(start_position);
-            for possible_path in possible_paths {
-                if !past_position.contains(&possible_path)
-                    && !self.is_move_blocked_by_wall_or_wrong(start_position, possible_path)
-                {
-                    past_position.push(possible_path);
-                    if self.player_can_win(possible_path, past_position, target, target_coordinate) {
-                        return true;
-                    }
-                }
-            }
-        }
-        false
+    fn player_can_win(&self, start_position: (usize, usize), target: usize) -> bool {
+        self.get_shortest_path(start_position, target).is_some()
+    }
+
+    pub fn get_shortest_path(&self, player: (usize, usize), target: usize) -> Option<Vec<(usize, usize)>> {
+        return a_star_generic_safe::AStar::run(Box::new(self), player, (Some(target), None));
     }
 }
 
@@ -229,12 +208,6 @@ impl a_star_generic_safe::PathGenerator for Quoridor {
     }
     fn calculate_cost(&self, current_position: (usize, usize), next_position: (usize, usize)) -> usize {
         1
-    }
-}
-
-impl Quoridor {
-    pub fn get_shortest_path(&self, player: (usize, usize), target: usize) -> Option<Vec<(usize, usize)>> {
-        return a_star_generic_safe::AStar::run(Box::new(self), player, (Some(target), None));
     }
 }
 
