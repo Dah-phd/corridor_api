@@ -1,6 +1,6 @@
 use super::*;
 use std::collections::HashMap;
-const CPU: &str = "|CPU|";
+pub const CPU: &str = "|CPU|";
 
 pub struct CpuPlayer {
     difficulty: f32,
@@ -12,7 +12,7 @@ pub struct CpuPlayer {
 }
 
 impl CpuPlayer {
-    pub fn get_cpu_move(game: &Quoridor) -> PlayerMove {
+    pub fn get_cpu_move(game: &Quoridor, only_palyer_moves_allowed: bool) -> PlayerMove {
         let mut instance = Self::new(game.clone());
         if instance.cpu_path.len() <= instance.player_path.len() {
             let new_position = instance.cpu_path.pop().unwrap();
@@ -20,12 +20,15 @@ impl CpuPlayer {
                 return PlayerMove::QuoridorMove(new_position, CPU.to_owned());
             }
         }
-        let maybe_wall = instance.get_best_wall();
-        if maybe_wall.is_some() {
-            return maybe_wall.unwrap();
+        if !only_palyer_moves_allowed {
+            let maybe_wall = instance.get_best_wall();
+            if maybe_wall.is_some() {
+                return maybe_wall.unwrap();
+            }
         }
         return PlayerMove::QuoridorMove(instance.cpu_path.pop().unwrap(), CPU.to_owned());
     }
+
     fn new(game: Quoridor) -> Self {
         Self {
             difficulty: 1.0,
@@ -56,7 +59,7 @@ impl CpuPlayer {
         let mut path_results_v: Vec<(usize, (usize, usize))> = Vec::new();
         for idx in 0..self.player_path.len() - 1 {
             self.add_new_hwall_path_result(self.player_path[idx], &mut path_results_h);
-            self.add_new_hwall_path_result(self.player_path[idx], &mut path_results_v);
+            self.add_new_vwall_path_result(self.player_path[idx], &mut path_results_v);
         }
         let max_h = path_results_h.iter().max_by(|a, b| a.cmp(&b));
         let max_v = path_results_v.iter().max_by(|a, b| a.cmp(&b));

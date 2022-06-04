@@ -222,6 +222,7 @@ pub struct QuoridorMatch {
     game: Quoridor,
     turn: usize,
     current: String,
+    only_player_moves_allowed: bool,
 }
 
 impl QuoridorMatch {
@@ -231,7 +232,7 @@ impl QuoridorMatch {
             PlayerMoveResult::Ok => (),
             _ => return player_status,
         }
-        if !self.game.new_h_wall(position) {
+        if self.only_player_moves_allowed || !self.game.new_h_wall(position) {
             return PlayerMoveResult::Unallowed;
         };
         if player == self.up_player {
@@ -239,7 +240,7 @@ impl QuoridorMatch {
         } else {
             self.game.down_player_free_walls -= 1
         }
-        self.switch_players();
+        self.switch_players_and_trigger_cpu_move();
         player_status
     }
 
@@ -249,7 +250,7 @@ impl QuoridorMatch {
             PlayerMoveResult::Ok => (),
             _ => return player_status,
         }
-        if !self.game.new_v_wall(position) {
+        if self.only_player_moves_allowed || !self.game.new_v_wall(position) {
             return PlayerMoveResult::Unallowed;
         }
         if player == self.up_player {
@@ -257,7 +258,7 @@ impl QuoridorMatch {
         } else {
             self.game.down_player_free_walls -= 1
         }
-        self.switch_players();
+        self.switch_players_and_trigger_cpu_move();
         player_status
     }
 
@@ -273,11 +274,19 @@ impl QuoridorMatch {
         PlayerMoveResult::Ok
     }
 
-    fn switch_players(&mut self) {
-        if self.current == self.up_player {
-            self.current = self.down_player.to_owned();
+    fn switch_players_and_trigger_cpu_move(&mut self) {
+        if self.game.up_player != self.game.down_player {
+            if self.current == self.up_player {
+                self.current = self.down_player.to_owned();
+            } else {
+                self.current = self.up_player.to_owned()
+            }
         } else {
-            self.current = self.up_player.to_owned()
+            self.only_player_moves_allowed = true
+        }
+        if self.current == cpu::CPU {
+            let cpu_move = cpu::CpuPlayer::get_cpu_move(&self.game, self.only_player_moves_allowed);
+            self.make_move(cpu_move);
         }
     }
 }
@@ -288,11 +297,16 @@ impl GameMatch for QuoridorMatch {
     fn new(player_list: &Vec<String>, owner: String) -> Self {
         QuoridorMatch {
             up_player: player_list[0].to_owned(),
-            down_player: player_list[1].to_owned(),
+            down_player: if player_list.len() >= 2 {
+                player_list[1].to_owned()
+            } else {
+                cpu::CPU.to_owned()
+            },
             owner,
             game: Quoridor::new(),
             turn: 0,
             current: player_list[0].to_owned(),
+            only_player_moves_allowed: false,
         }
     }
 
@@ -304,9 +318,8 @@ impl GameMatch for QuoridorMatch {
         if !self.game.move_player(new_position, player_code) {
             return PlayerMoveResult::Unallowed;
         }
-        if self.game.up_player != self.game.down_player {
-            self.switch_players();
-        }
+        self.only_player_moves_allowed = false;
+        self.switch_players_and_trigger_cpu_move();
         PlayerMoveResult::Ok
     }
 
