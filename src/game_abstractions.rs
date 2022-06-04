@@ -1,6 +1,4 @@
 use rocket::serde::{Deserialize, Serialize};
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
 use std::sync::Mutex;
 // importing Matchs for each game
 use crate::quoridor::QuoridorMatch;
@@ -224,46 +222,4 @@ impl ActiveMatchs {
         }
         None
     }
-
-    fn is_id_taken(exposed_vector: &Vec<Match>, owner: &String) -> bool {
-        for match_ in exposed_vector {
-            if match_.get_owner() == *owner {
-                return true;
-            }
-        }
-        false
-    }
 }
-
-// pub struct EventListener {
-//     event_map: HashMap<String, Vec<&'static fn(PlayerMove) -> bool>>,
-// }
-
-// impl EventListener {
-//     pub fn new() -> EventListener {
-//         EventListener {
-//             event_map: HashMap::new(),
-//         }
-//     }
-
-//     pub fn subscribe_to_event(&mut self, event: String, func: &'static fn(PlayerMove) -> bool) {
-//         match self.event_map.entry(event) {
-//             Entry::Vacant(e) => {
-//                 e.insert(vec![func]);
-//             }
-//             Entry::Occupied(mut e) => {
-//                 e.get_mut().push(func);
-//             }
-//         }
-//     }
-//     pub fn pass_event(&self, event: String, data: PlayerMove) {
-//         match self.event_map.get(&event) {
-//             Some(func_ls) => {
-//                 for func in func_ls {
-//                     func(data.clone());
-//                 }
-//             }
-//             None => (),
-//         }
-//     }
-// }
