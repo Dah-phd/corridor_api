@@ -374,7 +374,7 @@ mod test {
         assert!(new_game.new_h_wall((1, 4)));
         assert!(new_game.new_h_wall((1, 6)));
         assert!(new_game.new_v_wall((2, 6)));
-        assert_eq!(new_game.new_h_wall((3, 7)), false);
+        assert!(!new_game.new_h_wall((3, 7)));
     }
 
     #[test]
@@ -401,5 +401,43 @@ mod test {
         new_game.new_h_wall((1, 6));
         new_game.new_v_wall((2, 6));
         assert_eq!(new_game.get_shortest_path((0, 4), 8), expected_path);
+    }
+
+    #[test]
+    fn new_match_player_moves() {
+        let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned(), "pl2".to_owned()], "pl1".to_owned());
+        assert!(new_game.make_move(PlayerMove::QuoridorMove((1, 4), "pl1".to_owned())).is_ok());
+        assert_eq!(new_game.current, "pl2");
+        assert!(new_game.make_move(PlayerMove::QuoridorMove((8, 5), "pl2".to_owned())).is_ok());
+        assert_eq!(new_game.current, "pl1");
+    }
+
+    #[test]
+    fn new_match_make_borders() {
+        let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned(), "pl2".to_owned()], "pl1".to_owned());
+        assert!(new_game
+            .make_move(PlayerMove::QuoridorWallH((1, 0), "pl1".to_owned()))
+            .is_ok());
+        assert_eq!(new_game.current, "pl2");
+        assert!(new_game
+            .make_move(PlayerMove::QuoridorWallH((1, 2), "pl2".to_owned()))
+            .is_ok());
+        assert_eq!(new_game.current, "pl1");
+        assert!(new_game
+            .make_move(PlayerMove::QuoridorWallH((1, 4), "pl1".to_owned()))
+            .is_ok());
+        assert_eq!(new_game.current, "pl2");
+        assert!(new_game
+            .make_move(PlayerMove::QuoridorWallH((1, 6), "pl2".to_owned()))
+            .is_ok());
+        assert_eq!(new_game.current, "pl1");
+        assert!(new_game
+            .make_move(PlayerMove::QuoridorWallV((2, 6), "pl1".to_owned()))
+            .is_ok());
+        assert_eq!(new_game.current, "pl2");
+        assert!(!new_game
+            .make_move(PlayerMove::QuoridorWallH((3, 7), "pl2".to_owned()))
+            .is_ok());
+        assert_eq!(new_game.current, "pl2");
     }
 }
