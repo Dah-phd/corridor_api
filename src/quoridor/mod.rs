@@ -234,7 +234,7 @@ impl QuoridorMatch {
             return player_status;
         }
         if self.only_player_moves_allowed || !self.game.new_h_wall(position) {
-            return PlayerMoveResult::Unallowed;
+            return PlayerMoveResult::Disallowed;
         };
         self.remove_border_from_player(player);
         player_status
@@ -246,7 +246,7 @@ impl QuoridorMatch {
             return player_status;
         }
         if self.only_player_moves_allowed || !self.game.new_v_wall(position) {
-            return PlayerMoveResult::Unallowed;
+            return PlayerMoveResult::Disallowed;
         }
         self.remove_border_from_player(player);
         player_status
@@ -254,12 +254,12 @@ impl QuoridorMatch {
 
     fn player_is_valid(&self, player: &str) -> PlayerMoveResult {
         if player != self.current {
-            return PlayerMoveResult::WrongPlayer;
+            return PlayerMoveResult::WrongPlayerTurn;
         }
         if player == self.up_player && 1 > self.game.up_player_free_walls
             || player == self.down_player && 1 > self.game.down_player_free_walls
         {
-            return PlayerMoveResult::Unallowed;
+            return PlayerMoveResult::Disallowed;
         }
         PlayerMoveResult::Ok
     }
@@ -269,12 +269,10 @@ impl QuoridorMatch {
             self.only_player_moves_allowed = true;
             return;
         }
-        if self.game.up_player != self.game.down_player {
-            if self.current == self.up_player {
-                self.current = self.down_player.to_owned();
-            } else {
-                self.current = self.up_player.to_owned()
-            }
+        self.current = if self.current == self.up_player {
+            self.down_player.to_owned()
+        } else {
+            self.up_player.to_owned()
         }
     }
 
@@ -305,18 +303,14 @@ impl GameMatch for QuoridorMatch {
 
     fn move_player(&mut self, player: &str, new_position: Self::Position, options: Self::Spec) -> PlayerMoveResult {
         if self.current != player {
-            return PlayerMoveResult::WrongPlayer;
+            return PlayerMoveResult::WrongPlayerTurn;
         }
         let player_code = if player == self.up_player { "up" } else { "down" };
         if !self.game.move_player(new_position, player_code) {
-            return PlayerMoveResult::Unallowed;
+            return PlayerMoveResult::Disallowed;
         }
         self.only_player_moves_allowed = false;
         PlayerMoveResult::Ok
-    }
-
-    fn get_owner(&self) -> String {
-        self.owner.to_owned()
     }
 
     fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult {

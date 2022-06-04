@@ -11,27 +11,35 @@ pub struct CpuPlayer {
 impl CpuPlayer {
     pub fn get_cpu_move(game: &Quoridor, only_palyer_moves_allowed: bool) -> PlayerMove {
         let mut instance = Self::new(game.clone());
-        if instance.cpu_path.len() <= instance.player_path.len() {
-            let new_position = instance.cpu_path.pop().unwrap();
-            if instance.can_enemy_jump_over_cpu(new_position) {
-                return PlayerMove::QuoridorMove(new_position, CPU.to_owned());
-            }
-        }
-        if !only_palyer_moves_allowed {
+        let new_position = instance.cpu_path.pop().unwrap();
+        if !only_palyer_moves_allowed && !instance.is_cpu_closer(new_position) {
             let maybe_wall = instance.get_best_wall();
             if maybe_wall.is_some() {
                 return maybe_wall.unwrap();
             }
         }
-        return PlayerMove::QuoridorMove(instance.cpu_path.pop().unwrap(), CPU.to_owned());
+        return PlayerMove::QuoridorMove(new_position, CPU.to_owned());
+    }
+
+    fn is_cpu_closer(&self, position: (usize, usize)) -> bool {
+        self.cpu_path.len() <= self.player_path.len() && !self.can_enemy_jump_over_cpu(position)
+            || self.can_cpu_jump_over(position)
     }
 
     fn new(game: Quoridor) -> Self {
+        let mut cpu_path = game.get_shortest_path(game.down_player, 0).unwrap();
+        let mut player_path = game.get_shortest_path(game.up_player, 8).unwrap();
+        cpu_path.pop();
+        player_path.pop();
         Self {
-            cpu_path: game.get_shortest_path(game.down_player, 0).unwrap(),
-            player_path: game.get_shortest_path(game.up_player, 8).unwrap(),
+            cpu_path,
+            player_path,
             game,
         }
+    }
+
+    fn can_cpu_jump_over(&self, position: (usize, usize)) -> bool {
+        self.get_difference_between_total_positions(position, self.game.up_player) == 0
     }
 
     fn can_enemy_jump_over_cpu(&self, position: (usize, usize)) -> bool {
@@ -57,21 +65,26 @@ impl CpuPlayer {
         }
         let max_h = path_results_h.iter().max_by(|a, b| a.cmp(&b));
         let max_v = path_results_v.iter().max_by(|a, b| a.cmp(&b));
-        if max_h.is_none() && max_v.is_none() {
+        Self::create_move_from_wall_results(max_h, max_v)
+    }
+
+    fn create_move_from_wall_results(
+        h: Option<&(usize, (usize, usize))>,
+        v: Option<&(usize, (usize, usize))>,
+    ) -> Option<PlayerMove> {
+        if h.is_none() && v.is_none() {
             return None;
+        } else if h.is_none() {
+            return Some(PlayerMove::QuoridorWallV(v.unwrap().1, CPU.to_owned()));
+        } else if v.is_none() {
+            return Some(PlayerMove::QuoridorWallH(h.unwrap().1, CPU.to_owned()));
         }
-        if max_h.is_none() {
-            return Some(PlayerMove::QuoridorWallV(max_v.unwrap().1, CPU.to_owned()));
-        }
-        if max_v.is_none() {
-            return Some(PlayerMove::QuoridorWallH(max_h.unwrap().1, CPU.to_owned()));
-        }
-        let max_v = max_v.unwrap();
-        let max_h = max_h.unwrap();
-        if max_v.0 > max_h.0 {
-            return Some(PlayerMove::QuoridorWallV(max_v.1, CPU.to_owned()));
+        let v = v.unwrap();
+        let h = h.unwrap();
+        if v.0 > h.0 {
+            return Some(PlayerMove::QuoridorWallV(v.1, CPU.to_owned()));
         } else {
-            return Some(PlayerMove::QuoridorWallH(max_h.1, CPU.to_owned()));
+            return Some(PlayerMove::QuoridorWallH(h.1, CPU.to_owned()));
         }
     }
 

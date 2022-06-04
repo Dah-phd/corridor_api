@@ -8,7 +8,6 @@ pub trait GameMatch {
     type Spec;
     fn new(player_list: &Vec<String>, owner: String) -> Self;
     fn move_player(&mut self, player: &str, new_position: Self::Position, options: Self::Spec) -> PlayerMoveResult;
-    fn get_owner(&self) -> String;
     fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult;
     fn contains_player(&self, player: &str) -> bool;
 }
@@ -37,10 +36,10 @@ impl PlayerMove {
 #[serde(crate = "rocket::serde")]
 pub enum PlayerMoveResult {
     Ok,
-    WrongPlayer,
-    Unallowed,
-    Unknown,
+    WrongPlayerTurn,
+    Disallowed,
     Unauthorized,
+    Unknown,
 }
 impl PlayerMoveResult {
     pub fn is_ok(&self) -> bool {
