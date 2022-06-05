@@ -67,7 +67,6 @@ impl Match {
     pub fn new(player_list: &Vec<String>, owner: String, match_type: MatchType) -> Option<Self> {
         match match_type {
             MatchType::Quoridor => Some(Self::ActiveQuoridor(QuoridorMatch::new(player_list, owner))),
-            _ => None,
         }
     }
     pub fn get_owner(&self) -> String {
@@ -98,6 +97,7 @@ pub struct MatchRooms {
     pub rooms: Mutex<Vec<Room>>,
 }
 
+#[allow(dead_code)]
 impl MatchRooms {
     pub fn new() -> Self {
         Self {
@@ -177,6 +177,7 @@ pub struct ActiveMatchs {
     pub matchs: Mutex<Vec<Match>>,
 }
 
+#[allow(dead_code)]
 impl ActiveMatchs {
     pub fn new() -> Self {
         Self {

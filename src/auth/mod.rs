@@ -2,8 +2,6 @@ mod auth;
 use super::models;
 pub use auth::Token;
 use diesel;
-use diesel::prelude::*;
-#[macro_use]
 use rocket;
 
 const UNAUTHORIZED: rocket::serde::json::Json<UserResult<String>> = rocket::serde::json::Json(UserResult::UserNotFound);

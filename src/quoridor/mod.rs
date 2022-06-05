@@ -201,6 +201,8 @@ impl a_star_generic::PathGenerator for Quoridor {
         }
         target_row - position.0
     }
+
+    #[allow(unused_variables)]
     fn calculate_cost(&self, current_position: (usize, usize), next_position: (usize, usize)) -> usize {
         1
     }
@@ -238,6 +240,7 @@ impl GameMatch for QuoridorMatch {
         }
     }
 
+    #[allow(unused_variables)]
     fn move_player(&mut self, player: &str, new_position: Self::Position, options: Self::Spec) -> PlayerMoveResult {
         if self.current != player {
             return PlayerMoveResult::WrongPlayerTurn;
@@ -335,6 +338,7 @@ impl QuoridorMatch {
 }
 
 // used for testing
+#[allow(dead_code)]
 pub fn print_state(game: &Quoridor) {
     for row_id in 0..9 {
         let mut line = String::new();
