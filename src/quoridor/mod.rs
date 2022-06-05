@@ -219,69 +219,6 @@ pub struct QuoridorMatch {
     only_player_moves_allowed: bool,
 }
 
-impl QuoridorMatch {
-    fn remove_border_from_player(&mut self, player: &str) {
-        if player == self.up_player {
-            self.game.up_player_free_walls -= 1
-        } else {
-            self.game.down_player_free_walls -= 1
-        }
-    }
-
-    pub fn new_h_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
-        let player_status = self.player_is_valid(player);
-        if !player_status.is_ok() {
-            return player_status;
-        }
-        if self.only_player_moves_allowed || !self.game.new_h_wall(position) {
-            return PlayerMoveResult::Disallowed;
-        };
-        self.remove_border_from_player(player);
-        player_status
-    }
-
-    pub fn new_v_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
-        let player_status = self.player_is_valid(player);
-        if !player_status.is_ok() {
-            return player_status;
-        }
-        if self.only_player_moves_allowed || !self.game.new_v_wall(position) {
-            return PlayerMoveResult::Disallowed;
-        }
-        self.remove_border_from_player(player);
-        player_status
-    }
-
-    fn player_is_valid(&self, player: &str) -> PlayerMoveResult {
-        if player != self.current {
-            return PlayerMoveResult::WrongPlayerTurn;
-        }
-        if player == self.up_player && 1 > self.game.up_player_free_walls
-            || player == self.down_player && 1 > self.game.down_player_free_walls
-        {
-            return PlayerMoveResult::Disallowed;
-        }
-        PlayerMoveResult::Ok
-    }
-
-    fn next_player(&mut self) {
-        if self.game.up_player == self.game.down_player {
-            self.only_player_moves_allowed = true;
-            return;
-        }
-        self.current = if self.current == self.up_player {
-            self.down_player.to_owned()
-        } else {
-            self.up_player.to_owned()
-        }
-    }
-
-    fn maybe_trigger_cpu_player(&mut self) {
-        let cpu_move = cpu::CpuPlayer::get_cpu_move(&self.game, self.only_player_moves_allowed);
-        self.make_move(cpu_move);
-    }
-}
-
 impl GameMatch for QuoridorMatch {
     type Position = (usize, usize);
     type Spec = ();
@@ -321,14 +258,79 @@ impl GameMatch for QuoridorMatch {
             _ => PlayerMoveResult::Unknown,
         };
         if result.is_ok() {
-            self.next_player();
-            self.maybe_trigger_cpu_player();
+            self.end_turn();
         };
         result
     }
 
     fn contains_player(&self, player: &str) -> bool {
         self.up_player == player || self.down_player == player
+    }
+}
+
+impl QuoridorMatch {
+    pub fn new_h_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
+        let player_status = self.player_is_valid(player);
+        if !player_status.is_ok() {
+            return player_status;
+        }
+        if self.only_player_moves_allowed || !self.game.new_h_wall(position) {
+            return PlayerMoveResult::Disallowed;
+        };
+        self.remove_border_from_player(player);
+        player_status
+    }
+
+    pub fn new_v_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
+        let player_status = self.player_is_valid(player);
+        if !player_status.is_ok() {
+            return player_status;
+        }
+        if self.only_player_moves_allowed || !self.game.new_v_wall(position) {
+            return PlayerMoveResult::Disallowed;
+        }
+        self.remove_border_from_player(player);
+        player_status
+    }
+
+    fn remove_border_from_player(&mut self, player: &str) {
+        if player == self.up_player {
+            self.game.up_player_free_walls -= 1
+        } else {
+            self.game.down_player_free_walls -= 1
+        }
+    }
+
+    fn player_is_valid(&self, player: &str) -> PlayerMoveResult {
+        if player != self.current {
+            return PlayerMoveResult::WrongPlayerTurn;
+        }
+        if player == self.up_player && 1 > self.game.up_player_free_walls
+            || player == self.down_player && 1 > self.game.down_player_free_walls
+        {
+            return PlayerMoveResult::Disallowed;
+        }
+        PlayerMoveResult::Ok
+    }
+
+    fn end_turn(&mut self) {
+        if self.game.up_player == self.game.down_player {
+            self.only_player_moves_allowed = true;
+        } else {
+            self.current = if self.current == self.up_player {
+                self.down_player.to_owned()
+            } else {
+                self.up_player.to_owned()
+            }
+        }
+        if self.current == cpu::CPU {
+            self.cpu_player_move();
+        }
+    }
+
+    fn cpu_player_move(&mut self) {
+        let cpu_move = cpu::CpuPlayer::get_cpu_move(&self.game, self.only_player_moves_allowed);
+        self.make_move(cpu_move.clone());
     }
 }
 
@@ -439,5 +441,18 @@ mod test {
             .make_move(PlayerMove::QuoridorWallH((3, 7), "pl2".to_owned()))
             .is_ok());
         assert_eq!(new_game.current, "pl2");
+    }
+
+    #[test]
+    fn test_cpu() {
+        let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned()], "pl1".to_owned());
+        new_game.make_move(PlayerMove::QuoridorMove((1, 4), "pl1".to_owned()));
+        let cpu_move = cpu::CpuPlayer::get_cpu_move(&new_game.game, false);
+        if let PlayerMove::QuoridorWallH(v, _) = cpu_move {
+            assert_eq!(v, (2, 3))
+        } else {
+            assert!(false)
+        }
+        assert_eq!(new_game.current, "pl1".to_owned());
     }
 }
