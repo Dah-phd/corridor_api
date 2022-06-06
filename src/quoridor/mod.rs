@@ -29,26 +29,28 @@ impl Quoridor {
         }
     }
 
-    pub fn move_player(&mut self, new_position: (usize, usize), player: &str) -> bool {
-        match player {
-            "up" => {
-                if self.is_move_blocked_by_wall_or_wrong(self.up_player, new_position) {
-                    return false;
-                } else {
-                    self.up_player = new_position;
-                    return true;
-                }
-            }
-            "down" => {
-                if self.is_move_blocked_by_wall_or_wrong(self.down_player, new_position) {
-                    return false;
-                } else {
-                    self.down_player = new_position;
-                    return true;
-                }
-            }
-            _ => return false,
+    pub fn get_shortest_path(&self, player: (usize, usize), target: usize) -> Option<Vec<(usize, usize)>> {
+        return a_star_generic::AStar::run(Box::new(self), player, (Some(target), None));
+    }
+
+    fn player_can_win(&self, start_position: (usize, usize), target: usize) -> bool {
+        self.get_shortest_path(start_position, target).is_some()
+    }
+
+    pub fn move_up_player(&mut self, new_position: (usize, usize)) -> bool {
+        if self.is_move_blocked_by_wall_or_wrong(self.up_player, new_position) {
+            return false;
         }
+        self.up_player = new_position;
+        true
+    }
+
+    pub fn move_down_player(&mut self, new_position: (usize, usize)) -> bool {
+        if self.is_move_blocked_by_wall_or_wrong(self.down_player, new_position) {
+            return false;
+        }
+        self.down_player = new_position;
+        true
     }
 
     pub fn new_h_wall(&mut self, wall: (usize, usize)) -> bool {
@@ -113,14 +115,10 @@ impl Quoridor {
 
     fn is_move_blocked_by_wall_or_wrong(&self, start_position: (usize, usize), possible_path: (usize, usize)) -> bool {
         if start_position.0 == possible_path.0 {
-            let column_move = if possible_path.1 > start_position.1 {
-                (start_position.1, possible_path.1)
-            } else {
-                (possible_path.1, start_position.1)
-            };
+            let column_move = Self::sort_positions(possible_path.1, start_position.1);
             if column_move.1 - column_move.0 != 1 {
                 return true;
-            }
+            };
             for wall in &self.vertical_walls {
                 if wall.0 == start_position.0 && wall.1 == column_move.0 {
                     return true;
@@ -131,11 +129,7 @@ impl Quoridor {
             }
             return false;
         } else if start_position.1 == possible_path.1 {
-            let row_move = if possible_path.0 > start_position.0 {
-                (start_position.0, possible_path.0)
-            } else {
-                (possible_path.0, start_position.0)
-            };
+            let row_move = Self::sort_positions(possible_path.0, start_position.0);
             if row_move.1 - row_move.0 != 1 {
                 return true;
             };
@@ -150,6 +144,13 @@ impl Quoridor {
             return false;
         }
         true
+    }
+
+    fn sort_positions(x: usize, y: usize) -> (usize, usize) {
+        if x > y {
+            return (y, x);
+        }
+        (x, y)
     }
 
     fn build_possible_paths(&self, from_position: (usize, usize)) -> Vec<(usize, usize)> {
@@ -179,14 +180,6 @@ impl Quoridor {
             }
         }
         return possible_paths;
-    }
-
-    fn player_can_win(&self, start_position: (usize, usize), target: usize) -> bool {
-        self.get_shortest_path(start_position, target).is_some()
-    }
-
-    pub fn get_shortest_path(&self, player: (usize, usize), target: usize) -> Option<Vec<(usize, usize)>> {
-        return a_star_generic::AStar::run(Box::new(self), player, (Some(target), None));
     }
 }
 
@@ -245,8 +238,12 @@ impl GameMatch for QuoridorMatch {
         if self.current != player {
             return PlayerMoveResult::WrongPlayerTurn;
         }
-        let player_code = if player == self.up_player { "up" } else { "down" };
-        if !self.game.move_player(new_position, player_code) {
+        let move_successs = if player == self.up_player {
+            self.game.move_up_player(new_position)
+        } else {
+            self.game.move_down_player(new_position)
+        };
+        if !move_successs {
             return PlayerMoveResult::Disallowed;
         }
         self.only_player_moves_allowed = false;
