@@ -10,7 +10,7 @@ pub enum ChatID {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
-pub struct Messages {
+pub struct Message {
     pub id: ChatID,
     pub msg: String,
     pub player: String,

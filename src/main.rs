@@ -6,7 +6,7 @@ use game_abstractions::{ActiveMatchs, GameMatch, Match, MatchRooms, MatchType, P
 mod a_star_generic;
 mod auth;
 mod messages;
-use messages::{ChatID, Messages};
+use messages::{ChatID, Message};
 mod quoridor;
 #[macro_use]
 extern crate diesel;
@@ -16,9 +16,9 @@ mod models;
 
 #[post("/chat/sender", data = "<msg>")]
 fn post_message(
-    msg: rocket::serde::json::Json<Messages>,
+    msg: rocket::serde::json::Json<Message>,
     token: auth::Token,
-    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Messages>>,
+    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Message>>,
 ) {
     let _res = queue.send(msg.into_inner());
 }
@@ -91,7 +91,7 @@ fn room_to_session(
 async fn room_chat(
     room_owner: String,
     rooms: &rocket::State<MatchRooms>,
-    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Messages>>,
+    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Message>>,
     token: auth::Token,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
@@ -195,7 +195,7 @@ async fn match_events(
 #[get("/session_chat/<owner>")]
 async fn session_chat(
     owner: String,
-    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Messages>>,
+    queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Message>>,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
     let mut rx = queue.subscribe();
@@ -250,7 +250,7 @@ fn rocket() -> _ {
         )
         .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static/build")))
         .register("/", catchers![auth::forbidden])
-        .manage(rocket::tokio::sync::broadcast::channel::<Messages>(1024).0)
+        .manage(rocket::tokio::sync::broadcast::channel::<Message>(1024).0)
         .manage(rocket::tokio::sync::broadcast::channel::<Match>(1024).0)
         .manage(ActiveMatchs::new())
         .manage(rocket::tokio::sync::broadcast::channel::<Room>(1024).0)
