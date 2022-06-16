@@ -8,23 +8,15 @@ const KEY: &[u8] = b"secret";
 #[serde(crate = "rocket::serde")]
 pub struct Token {
     pub user: String,
-    // timestamp: i64,
 }
 
 impl Token {
     pub fn new(user: String) -> Self {
-        Self {
-            user,
-            // timestamp: chrono::Utc::now().timestamp(),
-        }
+        Self { user }
     }
 
     pub fn is_active(&self) -> bool {
         return true;
-        // if chrono::Utc::now().timestamp() - TOKEN_LIFE > self.timestamp {
-        //     return true;
-        // }
-        // false
     }
 
     pub fn encode(self) -> String {
@@ -35,11 +27,6 @@ impl Token {
         );
         token.unwrap()
     }
-
-    // pub fn refresh(mut self) -> String {
-    //     self.timestamp = chrono::Utc::now().timestamp();
-    //     self.encode()
-    // }
 
     pub fn decode(token: String) -> Option<Self> {
         match jsonwebtoken::decode::<Self>(

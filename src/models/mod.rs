@@ -22,6 +22,7 @@ impl DBLink {
 pub struct UserModel {
     mutex_guests: Mutex<HashMap<String, i64>>,
 }
+
 impl UserModel {
     pub fn new() -> Self {
         Self {
@@ -36,19 +37,19 @@ impl UserModel {
             .values(new_user.hash_password())
             .execute(conn)
     }
+
     pub fn new_guest(&self, user_name: &String) -> bool {
         let mut guests = self.mutex_guests.lock().unwrap();
         let exposed_hash = &mut *guests;
         let now = chrono::Utc::now().timestamp();
-        println!("{exposed_hash:?}");
         exposed_hash.retain(|_, v| *v > now);
-        println!("{exposed_hash:?}");
         if !exposed_hash.contains_key(user_name) {
             exposed_hash.insert(user_name.to_owned(), chrono::Utc::now().timestamp() + 1800);
             return true;
         }
         false
     }
+
     pub fn authenticate(&self, db: &DBLink, username: &String, pass: &String) -> bool {
         let db = db.mutex_db.lock().unwrap();
         let conn = &*db;
@@ -58,5 +59,24 @@ impl UserModel {
             return false;
         }
         return user_profile.unwrap().verify(pass);
+    }
+
+    pub fn user_is_active(&self, db: Option<&DBLink>, user: String) -> bool {
+        if let Some(db) = db {
+            use schema::users::dsl::*;
+            let conn = &*db.mutex_db.lock().unwrap();
+            let results: QueryResult<UserEntry> = users.filter(user.eq(user.to_owned())).get_result(conn);
+            if results.is_ok() {
+                return true;
+            }
+        }
+        let mut guests = self.mutex_guests.lock().unwrap();
+        let exposed_hash = &mut *guests;
+        let now = chrono::Utc::now().timestamp();
+        exposed_hash.retain(|_, v| *v > now);
+        if exposed_hash.contains_key(&user) {
+            return exposed_hash.insert(user, now + 1800).is_some();
+        }
+        false
     }
 }

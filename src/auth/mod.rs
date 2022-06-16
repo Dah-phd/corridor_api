@@ -49,10 +49,7 @@ fn get_naming_errors<T>(name: &String) -> Option<UserResult<T>> {
 }
 
 fn name_is_too_short(name: &String) -> bool {
-    if name.len() < 4 {
-        return true;
-    }
-    false
+    name.len() < 4
 }
 
 fn name_is_using_unsupported_symbols(name: &String) -> bool {
@@ -109,12 +106,12 @@ pub fn login(
     match user.into_inner() {
         User::User(username, password) => {
             if users.authenticate(db, &username, &password) {
-                return rocket::serde::json::Json(Option::Some(Token::new(username).encode()));
+                return rocket::serde::json::Json(Some(Token::new(username).encode()));
             }
         }
         User::Guest(username) => {
             if users.new_guest(&username) {
-                return rocket::serde::json::Json(Option::Some(Token::new(username).encode()));
+                return rocket::serde::json::Json(Some(Token::new(username).encode()));
             }
         }
     }
