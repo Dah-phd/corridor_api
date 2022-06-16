@@ -2,7 +2,7 @@
 extern crate rocket;
 use rocket::serde::{Deserialize, Serialize};
 mod game_abstractions;
-use game_abstractions::{ActiveMatchs, GameMatch, Match, MatchRooms, MatchType, PlayerMove, PlayerMoveResult, Room};
+use game_abstractions::{ActiveMatchs, GameMatch, Match, MatchRooms, MatchType, PlayerMove, PlayerMoveResult, Room, RoomBase};
 mod a_star_generic;
 mod auth;
 mod messages;
@@ -25,16 +25,18 @@ fn post_message(
 
 // rooms
 
-#[derive(Deserialize)]
-#[serde(crate = "rocket::serde")]
-struct RoomBase {
-    owner: String,
-    game: MatchType,
-}
-
 #[post("/create_room", data = "<room>")]
-fn make_room(room: rocket::serde::json::Json<RoomBase>, rooms: &rocket::State<MatchRooms>) -> rocket::serde::json::Json<bool> {
-    rocket::serde::json::Json(rooms.new_room(&room.owner, room.game))
+fn make_room(
+    room: rocket::serde::json::Json<RoomBase>,
+    token: auth::Token,
+    rooms: &rocket::State<MatchRooms>,
+) -> rocket::serde::json::Json<Option<ChatID>> {
+    if room.owner == token.user {
+        if let Some(owner) = rooms.new_room(room.into_inner()) {
+            return rocket::serde::json::Json(Some(ChatID::RoomID(owner)));
+        }
+    }
+    return rocket::serde::json::Json(None);
 }
 
 #[get("/join/<owner>")]

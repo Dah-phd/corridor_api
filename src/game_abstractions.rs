@@ -84,6 +84,13 @@ impl Match {
     }
 }
 
+#[derive(Deserialize)]
+#[serde(crate = "rocket::serde")]
+pub struct RoomBase {
+    pub owner: String,
+    pub game: MatchType,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Room {
@@ -109,21 +116,21 @@ impl MatchRooms {
         return self.rooms.lock().unwrap().clone().to_vec();
     }
 
-    pub fn new_room(&self, player_name: &str, match_type: MatchType) -> bool {
+    pub fn new_room(&self, room_base: RoomBase) -> Option<String> {
         let mut room_list = self.rooms.lock().unwrap();
         let exposed_vector = &mut *room_list;
         for room in exposed_vector.iter() {
-            if room.owner == player_name {
-                return false;
+            if room.owner == room_base.owner {
+                return None;
             }
         }
         exposed_vector.push(Room {
-            owner: player_name.to_owned(),
-            match_type,
-            player_list: vec![player_name.to_owned()],
+            owner: room_base.owner.to_owned(),
+            match_type: room_base.game,
+            player_list: vec![room_base.owner.to_owned()],
             game_started: false,
         });
-        true
+        Some(room_base.owner.to_owned())
     }
 
     pub fn kick_player(&self, owner: &str, player: &str) {
