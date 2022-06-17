@@ -33,7 +33,7 @@ fn post_message(
         }
         ChatID::RoomID(owner) => {
             let session = sessions.get_match(&owner);
-            if !session.is_some() || !session.unwrap().is_player_in_game(&token.user) {
+            if !session.is_some() || !session.unwrap().contains_player(&token.user) {
                 return;
             }
         }

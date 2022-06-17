@@ -10,6 +10,7 @@ pub trait GameMatch {
     fn move_player(&mut self, player: &str, new_position: Self::Position, options: Self::Spec) -> PlayerMoveResult;
     fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult;
     fn contains_player(&self, player: &str) -> bool;
+    fn get_type(&self) -> MatchType;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -83,7 +84,7 @@ impl Match {
         }
     }
 
-    pub fn is_player_in_game(&self, player: &String) -> bool {
+    pub fn contains_player(&self, player: &String) -> bool {
         match self {
             Match::ActiveQuoridor(game) => game.contains_player(player),
             _ => panic!("NotFound method called!"),

@@ -1,6 +1,6 @@
 extern crate rocket;
 use crate::a_star_generic;
-use crate::game_abstractions::{GameMatch, PlayerMove, PlayerMoveResult};
+use crate::game_abstractions::{GameMatch, MatchType, PlayerMove, PlayerMoveResult};
 use rocket::serde::{Deserialize, Serialize};
 mod cpu;
 
@@ -265,6 +265,9 @@ impl GameMatch for QuoridorMatch {
 
     fn contains_player(&self, player: &str) -> bool {
         self.up_player == player || self.down_player == player
+    }
+    fn get_type(&self) -> MatchType {
+        return MatchType::Quoridor;
     }
 }
 
