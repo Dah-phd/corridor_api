@@ -15,10 +15,6 @@ impl Token {
         Self { user }
     }
 
-    pub fn is_active(&self) -> bool {
-        return true;
-    }
-
     pub fn encode(self) -> String {
         let token = jsonwebtoken::encode(
             &jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS512),

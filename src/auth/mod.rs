@@ -90,7 +90,12 @@ impl User {
 }
 
 #[get("/auth/get_username")]
-pub fn get_user_name_from_token(token: auth::Token) -> rocket::serde::json::Json<String> {
+pub fn get_user_name_from_token(
+    token: auth::Token,
+    db: &rocket::State<models::DBLink>,
+    users: &rocket::State<models::UserModel>,
+) -> rocket::serde::json::Json<String> {
+    if !users.is_active(db, token.user.to_owned()) {}
     if &token.user.chars().last().unwrap() == &'|' {
         return rocket::serde::json::Json(token.user[..token.user.len() - 1].to_owned());
     }
@@ -111,7 +116,7 @@ pub fn login(
         }
         User::Guest(username) => {
             if users.new_guest(&username) {
-                return rocket::serde::json::Json(Some(Token::new(username).encode()));
+                return rocket::serde::json::Json(Some(Token::new(format!("{username}|")).encode()));
             }
         }
     }

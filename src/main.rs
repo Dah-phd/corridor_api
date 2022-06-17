@@ -46,9 +46,6 @@ fn join_room(
     rooms: &rocket::State<MatchRooms>,
     room_queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Room>>,
 ) {
-    if !token.is_active() {
-        return;
-    }
     if rooms.add_player(owner.to_owned(), token.user.to_owned()) {
         match rooms.get_by_owner(&owner) {
             Some(room) => {
@@ -75,7 +72,6 @@ fn room_to_session(
     room_queue: &rocket::State<rocket::tokio::sync::broadcast::Sender<Room>>,
     sessions: &rocket::State<ActiveMatchs>,
 ) {
-    if !token.is_active() {}
     let owner = token.user;
     let maybe_room = rooms.get_by_owner(&owner);
     match maybe_room {

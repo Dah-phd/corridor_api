@@ -61,22 +61,21 @@ impl UserModel {
         return user_profile.unwrap().verify(pass);
     }
 
-    pub fn user_is_active(&self, db: Option<&DBLink>, user: String) -> bool {
-        if let Some(db) = db {
+    fn refresh_guest(&self, user: String) -> bool {
+        let exposed_hash = &mut *self.mutex_guests.lock().unwrap();
+        let now = chrono::Utc::now().timestamp();
+        exposed_hash.retain(|_, v| *v > now);
+        return exposed_hash.contains_key(&user) && exposed_hash.insert(user, now + 1800).is_some();
+    }
+
+    pub fn is_active(&self, db: &DBLink, user: String) -> bool {
+        if &user.chars().last().unwrap() == &'|' {
+            self.refresh_guest(user)
+        } else {
             use schema::users::dsl::*;
             let conn = &*db.mutex_db.lock().unwrap();
             let results: QueryResult<UserEntry> = users.filter(user.eq(user.to_owned())).get_result(conn);
-            if results.is_ok() {
-                return true;
-            }
+            results.is_ok()
         }
-        let mut guests = self.mutex_guests.lock().unwrap();
-        let exposed_hash = &mut *guests;
-        let now = chrono::Utc::now().timestamp();
-        exposed_hash.retain(|_, v| *v > now);
-        if exposed_hash.contains_key(&user) {
-            return exposed_hash.insert(user, now + 1800).is_some();
-        }
-        false
     }
 }
