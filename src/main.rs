@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate rocket;
 use rocket::serde::json::Json;
-use rocket::serde::Serialize;
 use rocket::tokio::sync::broadcast::Sender;
 use rocket::State;
 mod game_abstractions;
@@ -18,7 +17,7 @@ mod models;
 //general
 
 #[post("/chat/sender", data = "<msg>")]
-fn post_message(msg: Json<Message>, token: auth::Token, queue: &State<Sender<Message>>) {
+fn post_message(msg: Json<Message>, _auth: auth::Token, queue: &State<Sender<Message>>) {
     let _res = queue.send(msg.into_inner());
 }
 
@@ -44,7 +43,7 @@ fn join_room(owner: String, token: auth::Token, rooms: &State<MatchRooms>, room_
 }
 
 #[get("/open_rooms")]
-fn get_all_rooms(rooms: &State<MatchRooms>, token: auth::Token) -> Json<Vec<Room>> {
+fn get_all_rooms(rooms: &State<MatchRooms>, _auth: auth::Token) -> Json<Vec<Room>> {
     Json(rooms.get_all())
 }
 
@@ -68,7 +67,7 @@ async fn room_chat(
     room_owner: String,
     rooms: &State<MatchRooms>,
     queue: &State<Sender<Message>>,
-    token: auth::Token,
+    _auth: auth::Token,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
     let room = rooms.get_by_owner(&room_owner);
@@ -149,7 +148,7 @@ fn get_game_state_by_owner(owner: String, active_sessions: &State<ActiveMatchs>)
 async fn match_events(
     owner: String,
     queue: &State<Sender<Match>>,
-    toket: auth::Token,
+    _toket: auth::Token,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
     let mut rx = queue.subscribe();
