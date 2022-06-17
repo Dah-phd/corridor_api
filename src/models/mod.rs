@@ -19,18 +19,10 @@ impl DBLink {
     }
 }
 
-pub struct UserModel {
-    mutex_guests: Mutex<HashMap<String, i64>>,
-}
+pub struct UserModel {}
 
 impl UserModel {
-    pub fn new() -> Self {
-        Self {
-            mutex_guests: Mutex::new(HashMap::new()),
-        }
-    }
-
-    pub fn new_user(&self, db: &DBLink, new_user: UserEntry) -> QueryResult<usize> {
+    pub fn new_user(db: &DBLink, new_user: UserEntry) -> QueryResult<usize> {
         let db = db.mutex_db.lock().unwrap();
         let conn = &*db;
         diesel::insert_into(schema::users::table)
@@ -38,19 +30,7 @@ impl UserModel {
             .execute(conn)
     }
 
-    pub fn new_guest(&self, user_name: &String) -> bool {
-        let mut guests = self.mutex_guests.lock().unwrap();
-        let exposed_hash = &mut *guests;
-        let now = chrono::Utc::now().timestamp();
-        exposed_hash.retain(|_, v| *v > now);
-        if !exposed_hash.contains_key(user_name) {
-            exposed_hash.insert(user_name.to_owned(), chrono::Utc::now().timestamp() + 1800);
-            return true;
-        }
-        false
-    }
-
-    pub fn authenticate(&self, db: &DBLink, username: &String, pass: &String) -> bool {
+    pub fn authenticate(db: &DBLink, username: &String, pass: &String) -> bool {
         let db = db.mutex_db.lock().unwrap();
         let conn = &*db;
         use schema::users::dsl::*;
@@ -58,24 +38,13 @@ impl UserModel {
         if user_profile.is_err() {
             return false;
         }
-        return user_profile.unwrap().verify(pass);
+        user_profile.unwrap().verify(pass)
     }
 
-    fn refresh_guest(&self, user: String) -> bool {
-        let exposed_hash = &mut *self.mutex_guests.lock().unwrap();
-        let now = chrono::Utc::now().timestamp();
-        exposed_hash.retain(|_, v| *v > now);
-        return exposed_hash.contains_key(&user) && exposed_hash.insert(user, now + 1800).is_some();
-    }
-
-    pub fn is_active(&self, db: &DBLink, user: String) -> bool {
-        if &user.chars().last().unwrap() == &'|' {
-            self.refresh_guest(user)
-        } else {
-            use schema::users::dsl::*;
-            let conn = &*db.mutex_db.lock().unwrap();
-            let results: QueryResult<UserEntry> = users.filter(user.eq(user.to_owned())).get_result(conn);
-            results.is_ok()
-        }
+    pub fn is_active(db: &DBLink, username: String) -> bool {
+        use schema::users::dsl::*;
+        let conn = &*db.mutex_db.lock().unwrap();
+        let result: QueryResult<UserEntry> = users.filter(user.eq(username.to_owned())).get_result(conn);
+        result.is_ok() && result.unwrap().active
     }
 }
