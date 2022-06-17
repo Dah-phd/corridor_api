@@ -17,7 +17,27 @@ mod models;
 //general
 
 #[post("/chat/sender", data = "<msg>")]
-fn post_message(msg: Json<Message>, _auth: auth::Token, queue: &State<Sender<Message>>) {
+fn post_message(
+    msg: Json<Message>,
+    token: auth::Token,
+    queue: &State<Sender<Message>>,
+    rooms: &State<MatchRooms>,
+    sessions: &State<ActiveMatchs>,
+) {
+    match &msg.id {
+        ChatID::MatchID(owner) => {
+            let room = rooms.get_by_owner(&owner);
+            if !room.is_some() || !room.unwrap().player_list.contains(&token.user) {
+                return;
+            }
+        }
+        ChatID::RoomID(owner) => {
+            let session = sessions.get_match(&owner);
+            if !session.is_some() || !session.unwrap().is_player_in_game(&token.user) {
+                return;
+            }
+        }
+    }
     let _res = queue.send(msg.into_inner());
 }
 
@@ -25,7 +45,7 @@ fn post_message(msg: Json<Message>, _auth: auth::Token, queue: &State<Sender<Mes
 
 #[post("/create_room", data = "<room>")]
 fn make_room(room: Json<RoomBase>, token: auth::Token, rooms: &State<MatchRooms>) -> Json<Option<ChatID>> {
-    if room.owner == token.user {
+    if room.owner == token.user && !token.is_guest() {
         if let Some(owner) = rooms.new_room(room.into_inner()) {
             return Json(Some(ChatID::RoomID(owner)));
         }
@@ -65,15 +85,10 @@ fn room_to_session(
 #[get("/room_chat/<room_owner>")]
 async fn room_chat(
     room_owner: String,
-    rooms: &State<MatchRooms>,
     queue: &State<Sender<Message>>,
-    _auth: auth::Token,
+    _toket: auth::Token,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
-    let room = rooms.get_by_owner(&room_owner);
-    // match room {
-    //     _ => rocket::response::Redirect::to();
-    // }
     let mut rx = queue.subscribe();
     rocket::response::stream::EventStream! {
         loop {
@@ -136,7 +151,7 @@ fn make_move(
 }
 
 #[get("/state/<owner>")]
-fn get_game_state_by_owner(owner: String, active_sessions: &State<ActiveMatchs>) -> Json<Match> {
+fn get_game_state_by_owner(owner: String, _auth: auth::Token, active_sessions: &State<ActiveMatchs>) -> Json<Match> {
     let session_state = active_sessions.get_match(&owner);
     match session_state {
         None => Json(Match::NotFound),
@@ -148,7 +163,7 @@ fn get_game_state_by_owner(owner: String, active_sessions: &State<ActiveMatchs>)
 async fn match_events(
     owner: String,
     queue: &State<Sender<Match>>,
-    _toket: auth::Token,
+    _auth: auth::Token,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
     let mut rx = queue.subscribe();

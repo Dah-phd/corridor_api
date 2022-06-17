@@ -1,9 +1,7 @@
 pub mod schema;
 pub mod users;
-use chrono;
 use diesel;
 use diesel::prelude::*;
-use std::collections::HashMap;
 use std::sync::Mutex;
 use users::UserEntry;
 

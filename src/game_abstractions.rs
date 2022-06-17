@@ -82,6 +82,13 @@ impl Match {
             _ => panic!("NotFound method called!"),
         }
     }
+
+    pub fn is_player_in_game(&self, player: &String) -> bool {
+        match self {
+            Match::ActiveQuoridor(game) => game.contains_player(player),
+            _ => panic!("NotFound method called!"),
+        }
+    }
 }
 
 #[derive(Deserialize)]
@@ -100,11 +107,16 @@ pub struct Room {
     pub game_started: bool,
 }
 
+impl Room {
+    pub fn player_in_room(&self, player: &String) -> bool {
+        self.player_list.contains(player)
+    }
+}
+
 pub struct MatchRooms {
     pub rooms: Mutex<Vec<Room>>,
 }
 
-#[allow(dead_code)]
 impl MatchRooms {
     pub fn new() -> Self {
         Self {
@@ -134,9 +146,8 @@ impl MatchRooms {
     }
 
     pub fn kick_player(&self, owner: &str, player: &str) {
-        let mut room_list = self.rooms.lock().unwrap();
-        let exposed_vector = &mut *room_list;
-        for room in exposed_vector {
+        let room_list = &mut *self.rooms.lock().unwrap();
+        for room in room_list {
             if room.owner == owner {
                 room.player_list.retain(|pl| pl != player);
                 return;
@@ -145,9 +156,8 @@ impl MatchRooms {
     }
 
     pub fn get_by_owner(&self, player_name: &str) -> Option<Room> {
-        let mut room_list = self.rooms.lock().unwrap();
-        let exposed_vector = &mut *room_list;
-        for room in exposed_vector {
+        let room_list = &mut *self.rooms.lock().unwrap();
+        for room in room_list {
             if room.owner == player_name {
                 return Some(room.clone());
             }
@@ -156,9 +166,8 @@ impl MatchRooms {
     }
 
     pub fn add_player(&self, owner: String, player: String) -> bool {
-        let mut room_list = self.rooms.lock().unwrap();
-        let exposed_vector = &mut *room_list;
-        for room in exposed_vector {
+        let room_list = &mut *self.rooms.lock().unwrap();
+        for room in room_list {
             if room.owner == owner {
                 room.player_list.push(player);
                 return true;
@@ -192,20 +201,18 @@ impl ActiveMatchs {
         }
     }
     pub fn append(&self, player_list: &Vec<String>, match_type: MatchType) -> bool {
-        let mut matchs_list = self.matchs.lock().unwrap();
-        let exposed_vector = &mut *matchs_list;
+        let matches_list = &mut *self.matchs.lock().unwrap();
         let new_match = Match::new(player_list, player_list[0].to_owned(), match_type);
         if new_match.is_none() {
             return false;
         }
-        exposed_vector.push(new_match.unwrap());
+        matches_list.push(new_match.unwrap());
         true
     }
 
     pub fn get_match(&self, player: &String) -> Option<Match> {
-        let mut matchs_list = self.matchs.lock().unwrap();
-        let exposed_vector = &mut *matchs_list;
-        for match_ in exposed_vector {
+        let matchs_list = &mut *self.matchs.lock().unwrap();
+        for match_ in matchs_list {
             if match_.unwrap().contains_player(player) {
                 return Some(match_.clone());
             }
@@ -214,20 +221,18 @@ impl ActiveMatchs {
     }
 
     pub fn drop(&self, owner: &String) {
-        let mut matchs_list = self.matchs.lock().unwrap();
-        let exposed_vector = &mut *matchs_list;
-        for (i, match_) in exposed_vector.iter().enumerate() {
+        let matchs_list = &mut *self.matchs.lock().unwrap();
+        for (i, match_) in matchs_list.iter().enumerate() {
             if match_.get_owner() == *owner {
-                exposed_vector.remove(i);
+                matchs_list.remove(i);
                 return;
             }
         }
     }
 
     pub fn make_move(&self, owner: &String, player_move: PlayerMove) -> Option<PlayerMoveResult> {
-        let mut matchs_list = self.matchs.lock().unwrap();
-        let exposed_vector = &mut *matchs_list;
-        for match_ in exposed_vector {
+        let matchs_list = &mut *self.matchs.lock().unwrap();
+        for match_ in matchs_list {
             let exposed_match = match_.unwrap();
             if exposed_match.owner == *owner {
                 return Some(exposed_match.make_move(player_move));

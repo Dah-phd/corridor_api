@@ -4,17 +4,20 @@ pub use auth::Token;
 use diesel;
 use models::UserModel;
 use rocket;
+use rocket::serde::json::Json;
+use rocket::serde::{Deserialize, Serialize};
 
-const UNAUTHORIZED: rocket::serde::json::Json<UserResult<String>> = rocket::serde::json::Json(UserResult::UserNotFound);
+const UNAUTHORIZED: Json<UserResult<String>> = Json(UserResult::UserNotFound);
+const UNSUPPORTED_CHARS: &str = "|*#;+/\\$%@! ~=<>";
 
-#[derive(rocket::serde::Serialize, rocket::serde::Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(crate = "rocket::serde")]
 pub enum User {
     User(String, String),
     Guest(String),
 }
 
-#[derive(rocket::serde::Serialize, rocket::serde::Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(crate = "rocket::serde")]
 pub enum UserResult<T> {
     Ok(T),
@@ -25,121 +28,68 @@ pub enum UserResult<T> {
 }
 
 impl<T> UserResult<T> {
-    pub fn ok_or_default(self, default: T) -> T {
-        match self {
-            Self::Ok(v) => v,
-            _ => default,
-        }
-    }
-    pub fn unwrap(self) -> T {
-        match self {
-            Self::Ok(v) => return v,
-            _ => panic!("No value to unwrap"),
-        }
-    }
-}
-
-fn get_naming_errors<T>(name: &String) -> Option<UserResult<T>> {
-    if name_is_using_unsupported_symbols(name) {
-        return Some(UserResult::UnsupportedSymbol);
-    }
-    if name_is_too_short(name) {
-        return Some(UserResult::NameTooShort);
-    }
-    None
-}
-
-fn name_is_too_short(name: &String) -> bool {
-    name.len() < 4
-}
-
-fn name_is_using_unsupported_symbols(name: &String) -> bool {
-    let arr = ["|"];
-    for symbol in arr {
-        if name.contains(symbol) {
+    pub fn is_ok(self) -> bool {
+        if let UserResult::Ok(_) = self {
             return true;
         }
+        false
     }
-    false
-}
 
-impl User {
-    pub fn update_guest_name(self) -> UserResult<Self> {
-        match self {
-            Self::User(name, pass) => {
-                let name_err = get_naming_errors(&name);
-                if name_err.is_some() {
-                    return name_err.unwrap();
-                }
-                return UserResult::Ok(Self::User(name, pass));
-            }
-            Self::Guest(name) => {
-                let name_err = get_naming_errors(&name);
-                if name_err.is_some() {
-                    return name_err.unwrap();
-                }
-                return UserResult::Ok(Self::Guest(name + "|"));
+    pub fn derive_naming_error(username: &str) -> Option<Self> {
+        if username.len() < 4 {
+            return Some(Self::NameTooShort);
+        }
+        for char in UNSUPPORTED_CHARS.chars() {
+            if username.contains(char) {
+                return Some(Self::UnsupportedSymbol);
             }
         }
-    }
-    pub fn unwrap_username(self) -> String {
-        match self {
-            Self::User(username, _) => return username,
-            Self::Guest(username) => return username,
-        }
+        None
     }
 }
 
 #[get("/auth/get_username")]
-pub fn get_user_name_from_token(token: auth::Token) -> rocket::serde::json::Json<String> {
-    return rocket::serde::json::Json(token.user);
-}
-
-#[get("/auth/new_token")]
-pub fn new_token(mut token: auth::Token) -> rocket::serde::json::Json<Option<String>> {
+pub fn get_user_name_from_token(mut token: auth::Token) -> Json<(String, String)> {
     token.refresh();
-    return rocket::serde::json::Json(Some(token.encode()));
+    return Json((token.user.to_owned(), token.encode()));
 }
 
 #[post("/auth/login", data = "<user>")]
-pub fn login(
-    user: rocket::serde::json::Json<User>,
-    db: &rocket::State<models::DBLink>,
-) -> rocket::serde::json::Json<Option<String>> {
+pub fn login(user: Json<User>, db: &rocket::State<models::DBLink>) -> Json<UserResult<String>> {
     match user.into_inner() {
         User::User(username, password) => {
             if UserModel::authenticate(db, &username, &password) {
-                return rocket::serde::json::Json(Some(Token::new(username).encode()));
+                return Json(UserResult::Ok(Token::new(username).encode()));
             }
         }
         User::Guest(username) => {
             let mut token = Token::new(username);
             token.set_time();
-            return rocket::serde::json::Json(Some(token.encode()));
+            return Json(UserResult::Ok(token.encode()));
         }
     }
-    rocket::serde::json::Json(None)
+    UNAUTHORIZED
 }
 
 #[post("/auth/register", data = "<new_user>")]
-pub fn register(
-    new_user: rocket::serde::json::Json<models::users::UserEntry>,
-    db: &rocket::State<models::DBLink>,
-) -> rocket::serde::json::Json<UserResult<String>> {
-    let user_data = new_user.into_inner();
-    let username = user_data.user.to_owned();
-    let writing_result = UserModel::new_user(db, user_data);
+pub fn register(new_user: Json<models::users::UserEntry>, db: &rocket::State<models::DBLink>) -> Json<UserResult<String>> {
+    let username = new_user.user.to_owned();
 
-    match writing_result {
+    let err: Option<UserResult<String>> = UserResult::derive_naming_error(&username);
+    if err.is_some() {
+        return Json(err.unwrap());
+    }
+
+    match UserModel::new_user(db, new_user.into_inner()) {
         diesel::QueryResult::Ok(_) => {
             let token = Token::new(username).encode();
-            rocket::serde::json::Json(UserResult::Ok(token))
+            Json(UserResult::Ok(token))
         }
-        diesel::QueryResult::Err(_) => UNAUTHORIZED,
+        _ => UNAUTHORIZED,
     }
 }
 
 #[catch(403)]
-pub fn forbidden(_: &rocket::Request) -> rocket::serde::json::Json<UserResult<String>> {
+pub fn forbidden(_: &rocket::Request) -> Json<UserResult<String>> {
     UNAUTHORIZED
 }
