@@ -91,12 +91,14 @@ impl User {
 }
 
 #[get("/auth/get_username")]
-pub fn get_user_name_from_token(token: auth::Token, db: &rocket::State<models::DBLink>) -> rocket::serde::json::Json<String> {
-    if !UserModel::is_active(db, token.user.to_owned()) {}
-    if &token.user.chars().last().unwrap() == &'|' {
-        return rocket::serde::json::Json(token.user[..token.user.len() - 1].to_owned());
-    }
+pub fn get_user_name_from_token(token: auth::Token) -> rocket::serde::json::Json<String> {
     return rocket::serde::json::Json(token.user);
+}
+
+#[get("/auth/new_token")]
+pub fn new_token(mut token: auth::Token) -> rocket::serde::json::Json<Option<String>> {
+    token.refresh();
+    return rocket::serde::json::Json(Some(token.encode()));
 }
 
 #[post("/auth/login", data = "<user>")]

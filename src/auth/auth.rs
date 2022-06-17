@@ -67,15 +67,18 @@ impl<'r> rocket::request::FromRequest<'r> for Token {
         if token_header.len() == 1 {
             let token = Self::decode(token_header[0].to_owned());
             if token.is_some() {
-                use super::models::DBLink;
                 let token = token.unwrap();
-                if token.is_guest() && token.is_active_guest() {}
-                let conn = request.rocket().state::<DBLink>();
-                if conn.is_none() {
-                    return rocket::request::Outcome::Failure((rocket::http::Status::ServiceUnavailable, ()));
-                }
-                if UserModel::is_active(conn.unwrap(), token.user.to_owned()) {
+                if token.is_guest() && token.is_active_guest() {
                     return rocket::request::Outcome::Success(token);
+                } else {
+                    use super::models::DBLink;
+                    let conn = request.rocket().state::<DBLink>();
+                    if conn.is_none() {
+                        return rocket::request::Outcome::Failure((rocket::http::Status::ServiceUnavailable, ()));
+                    }
+                    if UserModel::is_active(conn.unwrap(), &token.user) {
+                        return rocket::request::Outcome::Success(token);
+                    }
                 }
             }
         }

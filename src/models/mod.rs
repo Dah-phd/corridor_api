@@ -41,7 +41,7 @@ impl UserModel {
         user_profile.unwrap().verify(pass)
     }
 
-    pub fn is_active(db: &DBLink, username: String) -> bool {
+    pub fn is_active(db: &DBLink, username: &String) -> bool {
         use schema::users::dsl::*;
         let conn = &*db.mutex_db.lock().unwrap();
         let result: QueryResult<UserEntry> = users.filter(user.eq(username.to_owned())).get_result(conn);
