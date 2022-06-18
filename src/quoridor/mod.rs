@@ -1,10 +1,10 @@
 extern crate rocket;
 use crate::a_star_generic;
 use crate::game_abstractions::{GameMatch, MatchType, PlayerMove, PlayerMoveResult};
-use rocket::serde::{Deserialize, Serialize};
+use rocket::serde::Serialize;
 mod cpu;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Quoridor {
     up_player: (usize, usize),
@@ -35,7 +35,7 @@ impl Quoridor {
         self.get_shortest_path(start_position, target).is_some()
     }
 
-    fn move_up_player(&mut self, new_position: (usize, usize)) -> bool {
+    fn try_moving_up_player(&mut self, new_position: (usize, usize)) -> bool {
         if self.is_move_blocked_by_wall_or_wrong(self.up_player, new_position) {
             return false;
         }
@@ -43,7 +43,7 @@ impl Quoridor {
         true
     }
 
-    fn move_down_player(&mut self, new_position: (usize, usize)) -> bool {
+    fn try_moving_down_player(&mut self, new_position: (usize, usize)) -> bool {
         if self.is_move_blocked_by_wall_or_wrong(self.down_player, new_position) {
             return false;
         }
@@ -199,7 +199,7 @@ impl a_star_generic::PathGenerator for Quoridor {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct QuoridorMatch {
     #[serde(skip_serializing)]
@@ -233,27 +233,11 @@ impl GameMatch for QuoridorMatch {
         }
     }
 
-    fn move_player(&mut self, player: &str, new_position: Self::Position, _options: Self::Spec) -> PlayerMoveResult {
-        if self.current != player {
-            return PlayerMoveResult::WrongPlayerTurn;
-        }
-        let move_successs = if player == self.up_player {
-            self.game.move_up_player(new_position)
-        } else {
-            self.game.move_down_player(new_position)
-        };
-        if !move_successs {
-            return PlayerMoveResult::Disallowed;
-        }
-        self.only_player_moves_allowed = false;
-        PlayerMoveResult::Ok
-    }
-
     fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult {
         let result = match player_move {
             PlayerMove::QuoridorWallH(val, player) => self.new_h_wall(&player, val),
             PlayerMove::QuoridorWallV(val, player) => self.new_v_wall(&player, val),
-            PlayerMove::QuoridorMove(val, player) => self.move_player(&player, val, ()),
+            PlayerMove::QuoridorMove(val, player) => self.move_player(&player, val),
             _ => PlayerMoveResult::Unknown,
         };
         if result.is_ok() {
@@ -275,7 +259,35 @@ impl GameMatch for QuoridorMatch {
 }
 
 impl QuoridorMatch {
-    pub fn new_h_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
+    fn check_and_set_winner(&mut self, new_position: &(usize, usize), expect: usize) {
+        if new_position.0 == expect && expect == 8 || expect == 0 {
+            self.winner = Some(if expect == 8 {
+                self.up_player.to_owned()
+            } else {
+                self.down_player.to_owned()
+            })
+        }
+    }
+
+    fn move_player(&mut self, player: &str, new_position: (usize, usize)) -> PlayerMoveResult {
+        if self.current != player {
+            return PlayerMoveResult::WrongPlayerTurn;
+        }
+        if player == self.up_player {
+            if self.game.try_moving_up_player(new_position) {
+                self.check_and_set_winner(&new_position, 8);
+                return PlayerMoveResult::Ok;
+            }
+        } else if player == self.down_player {
+            if self.game.try_moving_down_player(new_position) {
+                self.check_and_set_winner(&new_position, 0);
+                return PlayerMoveResult::Ok;
+            }
+        };
+        PlayerMoveResult::Disallowed
+    }
+
+    fn new_h_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
         let player_status = self.player_is_valid(player);
         if !player_status.is_ok() {
             return player_status;
@@ -287,7 +299,7 @@ impl QuoridorMatch {
         player_status
     }
 
-    pub fn new_v_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
+    fn new_v_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
         let player_status = self.player_is_valid(player);
         if !player_status.is_ok() {
             return player_status;
@@ -320,9 +332,11 @@ impl QuoridorMatch {
     }
 
     fn end_turn(&mut self) {
+        self.turn += 1;
         if self.game.up_player == self.game.down_player {
             self.only_player_moves_allowed = true;
         } else {
+            self.only_player_moves_allowed = false;
             self.current = if self.current == self.up_player {
                 self.down_player.to_owned()
             } else {

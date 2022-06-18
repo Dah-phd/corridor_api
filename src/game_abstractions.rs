@@ -7,7 +7,6 @@ pub trait GameMatch {
     type Position;
     type Spec;
     fn new(player_list: &Vec<String>, owner: String) -> Self;
-    fn move_player(&mut self, player: &str, new_position: Self::Position, options: Self::Spec) -> PlayerMoveResult;
     fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult;
     fn contains_player(&self, player: &str) -> bool;
     fn get_type(&self) -> MatchType;
@@ -66,7 +65,7 @@ impl MatchType {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub enum Match {
     ActiveQuoridor(QuoridorMatch),
