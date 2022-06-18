@@ -10,7 +10,6 @@ mod auth;
 mod messages;
 use messages::{ChatID, Message};
 mod quoridor;
-use chrono;
 #[macro_use]
 extern crate diesel;
 mod models;
