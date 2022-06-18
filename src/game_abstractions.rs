@@ -101,31 +101,31 @@ pub struct RoomBase {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
-pub struct Room {
+pub struct Lobby {
     pub owner: String,
     pub match_type: MatchType,
     pub player_list: Vec<String>,
     pub game_started: bool,
 }
 
-impl Room {
+impl Lobby {
     pub fn player_in_room(&self, player: &String) -> bool {
         self.player_list.contains(player)
     }
 }
 
-pub struct MatchRooms {
-    pub rooms: Mutex<Vec<Room>>,
+pub struct MatchLobbies {
+    pub rooms: Mutex<Vec<Lobby>>,
 }
 
-impl MatchRooms {
+impl MatchLobbies {
     pub fn new() -> Self {
         Self {
             rooms: Mutex::new(Vec::new()),
         }
     }
 
-    pub fn get_all(&self) -> Vec<Room> {
+    pub fn get_all(&self) -> Vec<Lobby> {
         return self.rooms.lock().unwrap().clone().to_vec();
     }
 
@@ -137,7 +137,7 @@ impl MatchRooms {
                 return None;
             }
         }
-        exposed_vector.push(Room {
+        exposed_vector.push(Lobby {
             owner: room_base.owner.to_owned(),
             match_type: room_base.game,
             player_list: vec![room_base.owner.to_owned()],
@@ -156,7 +156,7 @@ impl MatchRooms {
         }
     }
 
-    pub fn get_by_owner(&self, player_name: &str) -> Option<Room> {
+    pub fn get_by_owner(&self, player_name: &str) -> Option<Lobby> {
         let room_list = &mut *self.rooms.lock().unwrap();
         for room in room_list {
             if room.owner == player_name {

@@ -4,7 +4,6 @@ use rocket::serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(crate = "rocket::serde")]
 pub enum ChatID {
-    RoomID(String),
     MatchID(String),
 }
 
