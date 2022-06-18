@@ -2,6 +2,8 @@ use rocket::serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 // importing Matchs for each game
 use crate::quoridor::QuoridorMatch;
+extern crate rand;
+use rand::{distributions::Alphanumeric, Rng};
 
 pub trait GameMatch {
     type Position;
@@ -74,14 +76,14 @@ pub enum Match {
 }
 
 impl Match {
-    pub fn new(player_list: &Vec<String>, owner: String, match_type: MatchType) -> Option<Self> {
+    pub fn new(player_list: &Vec<String>, owner: &str, match_type: MatchType) -> Option<Self> {
         match match_type {
-            MatchType::Quoridor => Some(Self::ActiveQuoridor(QuoridorMatch::new(player_list, owner))),
+            MatchType::Quoridor => Some(Self::ActiveQuoridor(QuoridorMatch::new(player_list, owner.to_owned()))),
         }
     }
     pub fn get_owner(&self) -> String {
         match self {
-            Match::ActiveQuoridor(v) => return v.owner.to_owned(),
+            Match::ActiveQuoridor(game) => return game.owner.to_owned(),
             _ => panic!("NotFound method called!"),
         }
     }
@@ -206,20 +208,35 @@ impl ActiveMatchs {
         }
     }
 
-    fn drop_finished(&self) {
+    pub fn create_cpu_game(&self, player: &str, game_type: MatchType) -> Option<String> {
+        let id_len = 8;
+        let mut id = generate_rand_string(id_len);
         let game_list = &mut *self.matchs.lock().unwrap();
-        game_list.retain(|x| x.get_winner().is_none())
+        while game_list.iter().any(|x| x.get_owner() == id) {
+            id = generate_rand_string(id_len)
+        }
+        let new_game = Match::new(&vec![player.to_owned()], &id, game_type);
+        if let Some(game) = new_game {
+            game_list.push(game);
+            return Some(id);
+        }
+        None
     }
 
     pub fn append(&self, lobby: &Lobby) -> bool {
         self.drop_finished();
         let game_list = &mut *self.matchs.lock().unwrap();
-        let new_game = Match::new(&lobby.player_list, lobby.player_list[0].to_owned(), lobby.match_type);
+        let new_game = Match::new(&lobby.player_list, &lobby.player_list[0], lobby.match_type);
         if new_game.is_none() {
             return false;
         }
         game_list.push(new_game.unwrap());
         true
+    }
+
+    fn drop_finished(&self) {
+        let game_list = &mut *self.matchs.lock().unwrap();
+        game_list.retain(|x| x.get_winner().is_none())
     }
 
     pub fn get_match(&self, player: &String) -> Option<Match> {
@@ -242,4 +259,13 @@ impl ActiveMatchs {
         }
         None
     }
+}
+
+pub fn generate_rand_string(len: usize) -> String {
+    let s: String = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(len)
+        .map(char::from)
+        .collect();
+    s
 }

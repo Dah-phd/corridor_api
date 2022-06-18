@@ -199,6 +199,7 @@ dependencies = [
  "diesel",
  "jsonwebtoken",
  "pwhash",
+ "rand",
  "regex",
  "rocket",
 ]

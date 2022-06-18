@@ -12,3 +12,4 @@ diesel = {version = "1.4.4", features = ["sqlite"]}
 jsonwebtoken = "8"
 pwhash = "1"
 regex = "1"
+rand = "0.8"

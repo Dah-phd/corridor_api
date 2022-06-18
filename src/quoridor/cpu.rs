@@ -1,5 +1,5 @@
 use super::*;
-pub const CPU: &str = "|CPU|";
+pub const CPU: &str = "|QCPU|";
 
 pub struct CpuPlayer {
     game: Quoridor,

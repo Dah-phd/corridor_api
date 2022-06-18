@@ -4,7 +4,9 @@ use rocket::serde::json::Json;
 use rocket::tokio::sync::broadcast::Sender;
 use rocket::State;
 mod game_abstractions;
-use game_abstractions::{ActiveMatchs, GameMatch, Lobby, LobbyBase, Match, MatchLobbies, PlayerMove, PlayerMoveResult};
+use game_abstractions::{
+    ActiveMatchs, GameMatch, Lobby, LobbyBase, Match, MatchLobbies, MatchType, PlayerMove, PlayerMoveResult,
+};
 mod a_star_generic;
 mod auth;
 mod messages;
@@ -49,6 +51,9 @@ fn join_lobby(
     sessions: &State<ActiveMatchs>,
     lobby_queue: &State<Sender<Lobby>>,
 ) -> Json<Option<String>> {
+    if owner == quoridor::cpu::CPU {
+        return Json(sessions.create_cpu_game(&token.user, MatchType::Quoridor));
+    }
     if let Some(mut lobby) = lobbies.add_player_to_lobby(&owner, &token.user) {
         if lobby.has_enough_players() {
             lobby.start();

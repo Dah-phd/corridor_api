@@ -2,7 +2,7 @@ extern crate rocket;
 use crate::a_star_generic;
 use crate::game_abstractions::{GameMatch, MatchType, PlayerMove, PlayerMoveResult};
 use rocket::serde::Serialize;
-mod cpu;
+pub mod cpu;
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(crate = "rocket::serde")]
