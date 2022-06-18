@@ -41,6 +41,7 @@ pub enum PlayerMoveResult {
     Disallowed,
     Unauthorized,
     Unknown,
+    GameFinished,
 }
 impl PlayerMoveResult {
     pub fn is_ok(&self) -> bool {

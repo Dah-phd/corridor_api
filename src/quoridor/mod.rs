@@ -234,6 +234,9 @@ impl GameMatch for QuoridorMatch {
     }
 
     fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult {
+        if self.winner.is_some() {
+            return PlayerMoveResult::GameFinished;
+        }
         let result = match player_move {
             PlayerMove::QuoridorWallH(val, player) => self.new_h_wall(&player, val),
             PlayerMove::QuoridorWallV(val, player) => self.new_v_wall(&player, val),
@@ -259,16 +262,6 @@ impl GameMatch for QuoridorMatch {
 }
 
 impl QuoridorMatch {
-    fn check_and_set_winner(&mut self, new_position: &(usize, usize), expect: usize) {
-        if new_position.0 == expect && expect == 8 || expect == 0 {
-            self.winner = Some(if expect == 8 {
-                self.up_player.to_owned()
-            } else {
-                self.down_player.to_owned()
-            })
-        }
-    }
-
     fn move_player(&mut self, player: &str, new_position: (usize, usize)) -> PlayerMoveResult {
         if self.current != player {
             return PlayerMoveResult::WrongPlayerTurn;
@@ -278,13 +271,19 @@ impl QuoridorMatch {
                 self.check_and_set_winner(&new_position, 8);
                 return PlayerMoveResult::Ok;
             }
-        } else if player == self.down_player {
+        } else {
             if self.game.try_moving_down_player(new_position) {
                 self.check_and_set_winner(&new_position, 0);
                 return PlayerMoveResult::Ok;
             }
         };
         PlayerMoveResult::Disallowed
+    }
+
+    fn check_and_set_winner(&mut self, new_position: &(usize, usize), expected: usize) {
+        if new_position.0 == expected {
+            self.winner = Some(self.current.to_owned())
+        }
     }
 
     fn new_h_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
@@ -311,14 +310,6 @@ impl QuoridorMatch {
         player_status
     }
 
-    fn remove_border_from_player(&mut self, player: &str) {
-        if player == self.up_player {
-            self.game.up_player_free_walls -= 1
-        } else {
-            self.game.down_player_free_walls -= 1
-        }
-    }
-
     fn player_is_valid(&self, player: &str) -> PlayerMoveResult {
         if player != self.current {
             return PlayerMoveResult::WrongPlayerTurn;
@@ -331,20 +322,32 @@ impl QuoridorMatch {
         PlayerMoveResult::Ok
     }
 
+    fn remove_border_from_player(&mut self, player: &str) {
+        if player == self.up_player {
+            self.game.up_player_free_walls -= 1
+        } else {
+            self.game.down_player_free_walls -= 1
+        }
+    }
+
     fn end_turn(&mut self) {
         self.turn += 1;
         if self.game.up_player == self.game.down_player {
             self.only_player_moves_allowed = true;
         } else {
             self.only_player_moves_allowed = false;
-            self.current = if self.current == self.up_player {
-                self.down_player.to_owned()
-            } else {
-                self.up_player.to_owned()
-            }
+            self.switch_player()
         }
         if self.current == cpu::CPU {
             self.cpu_player_move();
+        }
+    }
+
+    fn switch_player(&mut self) {
+        if self.current == self.up_player {
+            self.current = self.down_player.to_owned()
+        } else {
+            self.current = self.up_player.to_owned()
         }
     }
 
