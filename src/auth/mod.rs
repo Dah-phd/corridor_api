@@ -28,13 +28,6 @@ pub enum UserResult<T> {
 }
 
 impl<T> UserResult<T> {
-    pub fn is_ok(self) -> bool {
-        if let UserResult::Ok(_) = self {
-            return true;
-        }
-        false
-    }
-
     pub fn derive_naming_error(username: &str) -> Option<Self> {
         if username.len() < 4 {
             return Some(Self::NameTooShort);

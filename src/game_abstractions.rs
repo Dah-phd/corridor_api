@@ -11,6 +11,7 @@ pub trait GameMatch {
     fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult;
     fn contains_player(&self, player: &str) -> bool;
     fn get_type(&self) -> MatchType;
+    fn get_winner(&self) -> Option<String>;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -98,22 +99,29 @@ impl Match {
             _ => panic!("NotFound method called!"),
         }
     }
+
+    fn get_winner(&self) -> Option<String> {
+        match self {
+            Match::ActiveQuoridor(game) => game.get_winner(),
+            _ => panic!("NotFound method called!"),
+        }
+    }
 }
 
 #[derive(Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct LobbyBase {
     pub owner: String,
-    pub game: MatchType,
+    game: MatchType,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Lobby {
     pub owner: String,
-    pub match_type: MatchType,
-    pub player_list: Vec<String>,
-    pub game_started: Option<String>,
+    match_type: MatchType,
+    player_list: Vec<String>,
+    game_started: Option<String>,
     time_stamp: i64,
 }
 
@@ -188,23 +196,29 @@ impl MatchLobbies {
 }
 
 pub struct ActiveMatchs {
-    pub matchs: Mutex<Vec<Match>>,
+    matchs: Mutex<Vec<Match>>,
 }
 
-#[allow(dead_code)]
 impl ActiveMatchs {
     pub fn new() -> Self {
         Self {
             matchs: Mutex::new(Vec::new()),
         }
     }
+
+    fn drop_finished(&self) {
+        let game_list = &mut *self.matchs.lock().unwrap();
+        game_list.retain(|x| x.get_winner().is_none())
+    }
+
     pub fn append(&self, lobby: &Lobby) -> bool {
-        let matches_list = &mut *self.matchs.lock().unwrap();
-        let new_match = Match::new(&lobby.player_list, lobby.player_list[0].to_owned(), lobby.match_type);
-        if new_match.is_none() {
+        self.drop_finished();
+        let game_list = &mut *self.matchs.lock().unwrap();
+        let new_game = Match::new(&lobby.player_list, lobby.player_list[0].to_owned(), lobby.match_type);
+        if new_game.is_none() {
             return false;
         }
-        matches_list.push(new_match.unwrap());
+        game_list.push(new_game.unwrap());
         true
     }
 
@@ -216,16 +230,6 @@ impl ActiveMatchs {
             }
         }
         None
-    }
-
-    pub fn drop(&self, owner: &String) {
-        let matchs_list = &mut *self.matchs.lock().unwrap();
-        for (i, match_) in matchs_list.iter().enumerate() {
-            if match_.get_owner() == *owner {
-                matchs_list.remove(i);
-                return;
-            }
-        }
     }
 
     pub fn make_move(&self, owner: &String, player_move: PlayerMove) -> Option<PlayerMoveResult> {

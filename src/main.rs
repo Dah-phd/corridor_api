@@ -46,11 +46,13 @@ fn join_lobby(
     owner: String,
     token: auth::Token,
     lobbies: &State<MatchLobbies>,
+    sessions: &State<ActiveMatchs>,
     lobby_queue: &State<Sender<Lobby>>,
 ) -> Json<Option<String>> {
     if let Some(mut lobby) = lobbies.add_player_to_lobby(&owner, &token.user) {
         if lobby.has_enough_players() {
             lobby.start();
+            sessions.append(&lobby);
         }
         let _res = lobby_queue.send(lobby);
         return Json(Some(owner.to_owned()));
@@ -58,7 +60,7 @@ fn join_lobby(
     return Json(None);
 }
 
-#[get("/open_lobbies")]
+#[get("/active_lobbies")]
 fn get_all_lobbies(lobbies: &State<MatchLobbies>, _auth: auth::Token) -> Json<Vec<Lobby>> {
     Json(lobbies.get_all())
 }
@@ -107,7 +109,7 @@ fn make_move(
     Json(move_result)
 }
 
-#[get("/state/<owner>")]
+#[get("/game_state/<owner>")]
 fn get_game_state_by_owner(owner: String, _auth: auth::Token, active_sessions: &State<ActiveMatchs>) -> Json<Match> {
     let session_state = active_sessions.get_match(&owner);
     match session_state {
@@ -116,7 +118,7 @@ fn get_game_state_by_owner(owner: String, _auth: auth::Token, active_sessions: &
     }
 }
 
-#[get("/events/<owner>")]
+#[get("/game_events/<owner>")]
 async fn match_events(
     owner: String,
     queue: &State<Sender<Match>>,
@@ -139,7 +141,7 @@ async fn match_events(
     }
 }
 
-#[get("/session_chat/<owner>")]
+#[get("/game_chat/<owner>")]
 async fn session_chat(
     owner: String,
     queue: &State<Sender<Message>>,

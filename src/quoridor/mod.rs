@@ -7,13 +7,12 @@ mod cpu;
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Quoridor {
-    pub up_player: (usize, usize),
-    pub down_player: (usize, usize),
-    pub up_player_free_walls: usize,
-    pub down_player_free_walls: usize,
-    pub vertical_walls: Vec<(usize, usize)>,   // (row, col)
-    pub horizontal_walls: Vec<(usize, usize)>, // (row, col)
-    pub winner: Option<bool>,
+    up_player: (usize, usize),
+    down_player: (usize, usize),
+    up_player_free_walls: usize,
+    down_player_free_walls: usize,
+    vertical_walls: Vec<(usize, usize)>,   // (row, col)
+    horizontal_walls: Vec<(usize, usize)>, // (row, col)
 }
 
 impl Quoridor {
@@ -25,11 +24,10 @@ impl Quoridor {
             down_player_free_walls: 9,
             vertical_walls: Vec::new(),
             horizontal_walls: Vec::new(),
-            winner: None,
         }
     }
 
-    pub fn get_shortest_path(&self, player: (usize, usize), target: usize) -> Option<Vec<(usize, usize)>> {
+    fn get_shortest_path(&self, player: (usize, usize), target: usize) -> Option<Vec<(usize, usize)>> {
         return a_star_generic::AStar::run(Box::new(self), player, (Some(target), None));
     }
 
@@ -37,7 +35,7 @@ impl Quoridor {
         self.get_shortest_path(start_position, target).is_some()
     }
 
-    pub fn move_up_player(&mut self, new_position: (usize, usize)) -> bool {
+    fn move_up_player(&mut self, new_position: (usize, usize)) -> bool {
         if self.is_move_blocked_by_wall_or_wrong(self.up_player, new_position) {
             return false;
         }
@@ -45,7 +43,7 @@ impl Quoridor {
         true
     }
 
-    pub fn move_down_player(&mut self, new_position: (usize, usize)) -> bool {
+    fn move_down_player(&mut self, new_position: (usize, usize)) -> bool {
         if self.is_move_blocked_by_wall_or_wrong(self.down_player, new_position) {
             return false;
         }
@@ -53,7 +51,7 @@ impl Quoridor {
         true
     }
 
-    pub fn new_h_wall(&mut self, wall: (usize, usize)) -> bool {
+    fn new_h_wall(&mut self, wall: (usize, usize)) -> bool {
         if wall.0 > 7 || wall.1 > 7 {
             return false;
         }
@@ -83,7 +81,7 @@ impl Quoridor {
         !self.vertical_walls.contains(&new_wall)
     }
 
-    pub fn new_v_wall(&mut self, wall: (usize, usize)) -> bool {
+    fn new_v_wall(&mut self, wall: (usize, usize)) -> bool {
         if wall.0 > 7 || wall.1 > 7 {
             return false;
         }
@@ -211,6 +209,7 @@ pub struct QuoridorMatch {
     game: Quoridor,
     turn: usize,
     current: String,
+    winner: Option<String>,
     only_player_moves_allowed: bool,
 }
 
@@ -229,12 +228,12 @@ impl GameMatch for QuoridorMatch {
             game: Quoridor::new(),
             turn: 0,
             current: player_list[0].to_owned(),
+            winner: None,
             only_player_moves_allowed: false,
         }
     }
 
-    #[allow(unused_variables)]
-    fn move_player(&mut self, player: &str, new_position: Self::Position, options: Self::Spec) -> PlayerMoveResult {
+    fn move_player(&mut self, player: &str, new_position: Self::Position, _options: Self::Spec) -> PlayerMoveResult {
         if self.current != player {
             return PlayerMoveResult::WrongPlayerTurn;
         }
@@ -261,6 +260,10 @@ impl GameMatch for QuoridorMatch {
             self.end_turn();
         };
         result
+    }
+
+    fn get_winner(&self) -> Option<String> {
+        self.winner.clone()
     }
 
     fn contains_player(&self, player: &str) -> bool {
@@ -452,8 +455,8 @@ mod test {
         let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned()], "pl1".to_owned());
         new_game.make_move(PlayerMove::QuoridorMove((1, 4), "pl1".to_owned()));
         let cpu_move = cpu::CpuPlayer::get_cpu_move(&new_game.game, false);
-        if let PlayerMove::QuoridorWallH(v, _) = cpu_move {
-            assert_eq!(v, (2, 3))
+        if let PlayerMove::QuoridorWallH(position, _) = cpu_move {
+            assert_eq!(position, (2, 3))
         } else {
             assert!(false)
         }
