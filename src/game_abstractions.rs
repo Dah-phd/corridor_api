@@ -186,7 +186,7 @@ impl MatchLobbies {
         self.drop_expaired();
         let lobbies = &mut *self.lobbies.lock().unwrap();
         for lobby in lobbies {
-            if &lobby.owner == lobby_owner {
+            if &lobby.owner == lobby_owner && !lobby.player_list.contains(player) {
                 lobby.player_list.push(player.to_owned());
                 return Some(lobby.clone());
             }
