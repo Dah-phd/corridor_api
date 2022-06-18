@@ -57,6 +57,14 @@ pub enum MatchType {
     Quoridor,
 }
 
+impl MatchType {
+    pub fn get_expected_players(&self) -> usize {
+        match self {
+            Self::Quoridor => 2,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub enum Match {
@@ -94,7 +102,7 @@ impl Match {
 
 #[derive(Deserialize)]
 #[serde(crate = "rocket::serde")]
-pub struct RoomBase {
+pub struct LobbyBase {
     pub owner: String,
     pub game: MatchType,
 }
@@ -105,88 +113,77 @@ pub struct Lobby {
     pub owner: String,
     pub match_type: MatchType,
     pub player_list: Vec<String>,
-    pub game_started: bool,
+    pub game_started: Option<String>,
+    time_stamp: i64,
 }
 
 impl Lobby {
-    pub fn player_in_room(&self, player: &String) -> bool {
-        self.player_list.contains(player)
+    pub fn new(lobby_base: &LobbyBase) -> Self {
+        Self {
+            owner: lobby_base.owner.to_owned(),
+            match_type: lobby_base.game,
+            player_list: vec![lobby_base.owner.to_owned()],
+            game_started: None,
+            time_stamp: chrono::Utc::now().timestamp() + 600,
+        }
+    }
+
+    pub fn start(&mut self) {
+        self.game_started = Some(self.owner.to_owned())
+    }
+
+    pub fn expaired(&self) -> bool {
+        self.time_stamp < chrono::Utc::now().timestamp()
+    }
+
+    pub fn has_enough_players(&self) -> bool {
+        self.match_type.get_expected_players() == self.player_list.len()
     }
 }
 
 pub struct MatchLobbies {
-    pub rooms: Mutex<Vec<Lobby>>,
+    pub lobbies: Mutex<Vec<Lobby>>,
 }
 
 impl MatchLobbies {
     pub fn new() -> Self {
         Self {
-            rooms: Mutex::new(Vec::new()),
+            lobbies: Mutex::new(Vec::new()),
         }
+    }
+
+    fn drop_expaired(&self) {
+        let lobbies = &mut *self.lobbies.lock().unwrap();
+        lobbies.retain(|x| !x.expaired());
     }
 
     pub fn get_all(&self) -> Vec<Lobby> {
-        return self.rooms.lock().unwrap().clone().to_vec();
+        self.drop_expaired();
+        return self.lobbies.lock().unwrap().clone().to_vec();
     }
 
-    pub fn new_room(&self, room_base: RoomBase) -> Option<String> {
-        let mut room_list = self.rooms.lock().unwrap();
-        let exposed_vector = &mut *room_list;
-        for room in exposed_vector.iter() {
-            if room.owner == room_base.owner {
+    pub fn new_lobby(&self, lobby_base: LobbyBase) -> Option<String> {
+        self.drop_expaired();
+        let lobbies = &mut *self.lobbies.lock().unwrap();
+        for lobby in lobbies.iter() {
+            if lobby.owner == lobby_base.owner {
                 return None;
             }
         }
-        exposed_vector.push(Lobby {
-            owner: room_base.owner.to_owned(),
-            match_type: room_base.game,
-            player_list: vec![room_base.owner.to_owned()],
-            game_started: false,
-        });
-        Some(room_base.owner.to_owned())
+        lobbies.push(Lobby::new(&lobby_base));
+        Some(lobby_base.owner.to_owned())
     }
 
-    pub fn kick_player(&self, owner: &str, player: &str) {
-        let room_list = &mut *self.rooms.lock().unwrap();
-        for room in room_list {
-            if room.owner == owner {
-                room.player_list.retain(|pl| pl != player);
-                return;
-            }
-        }
-    }
-
-    pub fn get_by_owner(&self, player_name: &str) -> Option<Lobby> {
-        let room_list = &mut *self.rooms.lock().unwrap();
-        for room in room_list {
-            if room.owner == player_name {
-                return Some(room.clone());
+    pub fn add_player_to_lobby(&self, lobby_owner: &String, player: &String) -> Option<Lobby> {
+        self.drop_expaired();
+        let lobbies = &mut *self.lobbies.lock().unwrap();
+        for lobby in lobbies {
+            if &lobby.owner == lobby_owner {
+                lobby.player_list.push(player.to_owned());
+                return Some(lobby.clone());
             }
         }
         None
-    }
-
-    pub fn add_player(&self, owner: String, player: String) -> bool {
-        let room_list = &mut *self.rooms.lock().unwrap();
-        for room in room_list {
-            if room.owner == owner {
-                room.player_list.push(player);
-                return true;
-            }
-        }
-        false
-    }
-
-    pub fn drop(&self, player_name: &str) -> bool {
-        let mut room_list = self.rooms.lock().unwrap();
-        let exposed_vector = &mut *room_list;
-        for (i, room) in exposed_vector.iter().enumerate() {
-            if room.owner == player_name {
-                exposed_vector.remove(i);
-                return true;
-            }
-        }
-        false
     }
 }
 
@@ -201,9 +198,9 @@ impl ActiveMatchs {
             matchs: Mutex::new(Vec::new()),
         }
     }
-    pub fn append(&self, player_list: &Vec<String>, match_type: MatchType) -> bool {
+    pub fn append(&self, lobby: &Lobby) -> bool {
         let matches_list = &mut *self.matchs.lock().unwrap();
-        let new_match = Match::new(player_list, player_list[0].to_owned(), match_type);
+        let new_match = Match::new(&lobby.player_list, lobby.player_list[0].to_owned(), lobby.match_type);
         if new_match.is_none() {
             return false;
         }

@@ -4,12 +4,13 @@ use rocket::serde::json::Json;
 use rocket::tokio::sync::broadcast::Sender;
 use rocket::State;
 mod game_abstractions;
-use game_abstractions::{ActiveMatchs, GameMatch, Lobby, Match, MatchLobbies, PlayerMove, PlayerMoveResult, RoomBase};
+use game_abstractions::{ActiveMatchs, GameMatch, Lobby, LobbyBase, Match, MatchLobbies, PlayerMove, PlayerMoveResult};
 mod a_star_generic;
 mod auth;
 mod messages;
 use messages::{ChatID, Message};
 mod quoridor;
+use chrono;
 #[macro_use]
 extern crate diesel;
 mod models;
@@ -32,9 +33,9 @@ fn post_message(msg: Json<Message>, token: auth::Token, queue: &State<Sender<Mes
 // lobbies
 
 #[post("/create_lobby", data = "<lobby>")]
-fn make_room(lobby: Json<RoomBase>, token: auth::Token, lobbies: &State<MatchLobbies>) -> Json<Option<String>> {
+fn make_lobby(lobby: Json<LobbyBase>, token: auth::Token, lobbies: &State<MatchLobbies>) -> Json<Option<String>> {
     if lobby.owner == token.user && !token.is_guest() {
-        if let Some(owner) = lobbies.new_room(lobby.into_inner()) {
+        if let Some(owner) = lobbies.new_lobby(lobby.into_inner()) {
             return Json(Some(owner));
         }
     }
@@ -42,36 +43,29 @@ fn make_room(lobby: Json<RoomBase>, token: auth::Token, lobbies: &State<MatchLob
 }
 
 #[get("/join/<owner>")]
-fn join_room(owner: String, token: auth::Token, lobbies: &State<MatchLobbies>, room_queue: &State<Sender<Lobby>>) {
-    if lobbies.add_player(owner.to_owned(), token.user.to_owned()) {
-        if let Some(lobby) = lobbies.get_by_owner(&owner) {
-            let _res = room_queue.send(lobby);
+fn join_lobby(
+    owner: String,
+    token: auth::Token,
+    lobbies: &State<MatchLobbies>,
+    lobby_queue: &State<Sender<Lobby>>,
+) -> Json<Option<String>> {
+    if let Some(mut lobby) = lobbies.add_player_to_lobby(&owner, &token.user) {
+        if lobby.has_enough_players() {
+            lobby.start();
         }
+        let _res = lobby_queue.send(lobby);
+        return Json(Some(owner.to_owned()));
     }
+    return Json(None);
 }
 
-#[get("/open_rooms")]
-fn get_all_rooms(lobbies: &State<MatchLobbies>, _auth: auth::Token) -> Json<Vec<Lobby>> {
+#[get("/open_lobbies")]
+fn get_all_lobbies(lobbies: &State<MatchLobbies>, _auth: auth::Token) -> Json<Vec<Lobby>> {
     Json(lobbies.get_all())
 }
 
-#[get("/start_game")]
-fn room_to_session(
-    token: auth::Token,
-    lobbies: &State<MatchLobbies>,
-    room_queue: &State<Sender<Lobby>>,
-    sessions: &State<ActiveMatchs>,
-) {
-    if let Some(mut lobby) = lobbies.get_by_owner(&token.user) {
-        lobby.game_started = true;
-        if sessions.append(&lobby.player_list, lobby.match_type) {
-            let _res = room_queue.send(lobby);
-        }
-    }
-}
-
-#[get("/room_events/<owner>")]
-async fn room_events(
+#[get("/lobby_events/<owner>")]
+async fn lobby_events(
     owner: String,
     queue: &State<Sender<Lobby>>,
     mut end: rocket::Shutdown,
@@ -194,11 +188,10 @@ fn rocket() -> _ {
                 session_chat,
                 match_events,
                 get_game_state_by_owner,
-                room_to_session,
-                get_all_rooms,
-                join_room,
-                make_room,
-                room_events,
+                get_all_lobbies,
+                join_lobby,
+                make_lobby,
+                lobby_events,
             ],
         )
         .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static/build")))
