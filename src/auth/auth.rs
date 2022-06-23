@@ -65,7 +65,7 @@ impl<'r> FromRequest<'r> for Token {
     type Error = ();
 
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, ()> {
-        let token_header: Vec<_> = request.headers().get("token").collect();
+        let token_header: Vec<_> = request.headers().get("gamertag").collect();
         if token_header.len() == 1 {
             if let Some(token) = Self::decode(token_header[0].to_owned()) {
                 if token.is_guest() && token.is_active_guest() {
