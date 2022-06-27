@@ -86,7 +86,7 @@ impl<'r> FromRequest<'r> for Token {
                         return Outcome::Failure((Status::ServiceUnavailable, ()));
                     }
                     if let Some(token) = Self::decode(gamertag.to_owned(), &token_services.unwrap().validator) {
-                        if token.is_guest() && token.is_active_guest() || UserModel::is_active(conn.unwrap(), &token.user) {
+                        if token.is_active_guest() || UserModel::is_active(conn.unwrap(), &token.user) {
                             return Outcome::Success(token);
                         }
                     }
