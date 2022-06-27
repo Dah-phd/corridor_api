@@ -7,8 +7,9 @@ use rocket::http::Status;
 use rocket::request::{FromRequest, Outcome, Request};
 
 const KEY: &[u8] = b"secret";
+const TOKEN_ID: &str = "gamertag";
 
-#[derive(rocket::serde::Serialize, rocket::serde::Deserialize)]
+#[derive(rocket::serde::Serialize, rocket::serde::Deserialize, Debug)]
 #[serde(crate = "rocket::serde")]
 pub struct Token {
     pub user: String,
@@ -39,23 +40,32 @@ impl Token {
         return self;
     }
 
-    pub fn encode(self) -> String {
-        let token = jsonwebtoken::encode(
-            &jsonwebtoken::Header::new(jsonwebtoken::Algorithm::HS512),
-            &self,
-            &jsonwebtoken::EncodingKey::from_secret(KEY),
-        );
+    pub fn encode(self, header: &jsonwebtoken::Header) -> String {
+        let token = jsonwebtoken::encode(header, &self, &jsonwebtoken::EncodingKey::from_secret(KEY));
         token.unwrap()
     }
 
-    pub fn decode(token: String) -> Option<Self> {
-        match jsonwebtoken::decode::<Self>(
-            &token,
-            &jsonwebtoken::DecodingKey::from_secret(KEY),
-            &jsonwebtoken::Validation::new(jsonwebtoken::Algorithm::HS512),
-        ) {
+    pub fn decode(token: String, validator: &jsonwebtoken::Validation) -> Option<Self> {
+        match jsonwebtoken::decode::<Self>(&token, &jsonwebtoken::DecodingKey::from_secret(KEY), validator) {
             Ok(v) => Some(v.claims),
             _ => None,
+        }
+    }
+}
+
+pub struct AuthTokenServices {
+    pub header: jsonwebtoken::Header,
+    pub validator: jsonwebtoken::Validation,
+}
+
+impl AuthTokenServices {
+    pub fn new() -> Self {
+        let mut validator = jsonwebtoken::Validation::default();
+        validator.required_spec_claims.clear();
+        validator.validate_exp = false;
+        Self {
+            header: jsonwebtoken::Header::default(),
+            validator,
         }
     }
 }
@@ -65,23 +75,38 @@ impl<'r> FromRequest<'r> for Token {
     type Error = ();
 
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, ()> {
-        let token_header: Vec<_> = request.headers().get("gamertag").collect();
-        if token_header.len() == 1 {
-            if let Some(token) = Self::decode(token_header[0].to_owned()) {
-                if token.is_guest() && token.is_active_guest() {
-                    return Outcome::Success(token);
-                } else {
+        let cookies: Vec<_> = request.headers().get("cookie").collect();
+        if cookies.len() > 0 {
+            if let Some(maybe_gamertag) = cookies.iter().find(|data| data.starts_with(TOKEN_ID)) {
+                if let Some(gamertag) = maybe_gamertag.split("=").last() {
                     use super::models::DBLink;
+                    let token_services = request.rocket().state::<AuthTokenServices>();
                     let conn = request.rocket().state::<DBLink>();
-                    if conn.is_none() {
+                    if token_services.is_none() || conn.is_none() {
                         return Outcome::Failure((Status::ServiceUnavailable, ()));
                     }
-                    if UserModel::is_active(conn.unwrap(), &token.user) {
-                        return Outcome::Success(token);
+                    if let Some(token) = Self::decode(gamertag.to_owned(), &token_services.unwrap().validator) {
+                        if token.is_guest() && token.is_active_guest() || UserModel::is_active(conn.unwrap(), &token.user) {
+                            return Outcome::Success(token);
+                        }
                     }
                 }
             }
         }
         rocket::request::Outcome::Failure((Status::Forbidden, ()))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn make_token() {
+        let token_service = AuthTokenServices::new();
+        let name = "ALFA";
+        let token = Token::new(name.to_owned());
+        let code = token.encode(&token_service.header);
+        let decoded = Token::decode(code, &token_service.validator).unwrap();
+        assert_eq!(decoded.user, name);
     }
 }

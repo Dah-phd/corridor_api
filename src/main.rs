@@ -208,4 +208,5 @@ fn rocket() -> _ {
         .manage(rocket::tokio::sync::broadcast::channel::<Lobby>(1024).0)
         .manage(MatchLobbies::new())
         .manage(models::DBLink::new("./db.sqlite3"))
+        .manage(auth::AuthTokenServices::new())
 }
