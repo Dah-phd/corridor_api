@@ -17,7 +17,6 @@ extern crate diesel;
 mod models;
 
 //general
-
 #[post("/chat/sender", data = "<msg>")]
 fn post_message(msg: Json<Message>, token: auth::Token, queue: &State<Sender<Message>>, sessions: &State<ActiveMatchs>) {
     match &msg.id {
@@ -32,7 +31,6 @@ fn post_message(msg: Json<Message>, token: auth::Token, queue: &State<Sender<Mes
 }
 
 // lobbies
-
 #[post("/create_lobby", data = "<lobby>")]
 fn make_lobby(lobby: Json<LobbyBase>, token: auth::Token, lobbies: &State<MatchLobbies>) -> Json<Option<String>> {
     if lobby.owner == token.user && !token.is_guest() {
@@ -91,8 +89,8 @@ async fn lobby_events(
         }
     }
 }
-// sessions
 
+// sessions
 #[post("/move/<owner>", data = "<player_move>")]
 fn make_move(
     owner: String,
