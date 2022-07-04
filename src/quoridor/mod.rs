@@ -254,7 +254,7 @@ impl GameMatch for QuoridorMatch {
     }
 
     fn contains_player(&self, player: &str) -> bool {
-        self.up_player == player || self.down_player == player
+        self.up_player == player || self.down_player == player || self.owner == player
     }
     fn get_type(&self) -> MatchType {
         return MatchType::Quoridor;
