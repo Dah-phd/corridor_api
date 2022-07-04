@@ -47,7 +47,11 @@ impl UserModel {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-}
+// #[cfg(test)]
+// mod test {
+//     use super::*;
+//     #[test]
+//     fn test_db() {
+//         todo!();
+//     }
+// }
