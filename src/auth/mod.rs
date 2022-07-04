@@ -86,8 +86,8 @@ pub fn register(
 
     match UserModel::new_user(db, new_user.into_inner()) {
         diesel::QueryResult::Ok(_) => {
-            let token = Token::new(username).encode(&token_services.header);
-            Json(UserResult::Ok(token))
+            let token = Token::new(username);
+            Json(UserResult::Ok(token.encode(&token_services.header)))
         }
         _ => UNAUTHORIZED,
     }

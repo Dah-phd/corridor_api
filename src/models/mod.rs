@@ -46,3 +46,8 @@ impl UserModel {
         result.is_ok() && result.unwrap().active
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+}
