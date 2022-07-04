@@ -240,19 +240,19 @@ impl ActiveMatchs {
     }
 
     pub fn get_match(&self, player: &String) -> Option<Match> {
-        let matchs_list = &mut *self.matchs.lock().unwrap();
-        for match_ in matchs_list {
-            if match_.unwrap().contains_player(player) {
-                return Some(match_.clone());
+        let game_list = &mut *self.matchs.lock().unwrap();
+        for game in game_list {
+            if game.unwrap().contains_player(player) {
+                return Some(game.clone());
             }
         }
         None
     }
 
     pub fn make_move(&self, owner: &String, player_move: PlayerMove) -> Option<PlayerMoveResult> {
-        let matchs_list = &mut *self.matchs.lock().unwrap();
-        for match_ in matchs_list {
-            let exposed_match = match_.unwrap();
+        let game_list = &mut *self.matchs.lock().unwrap();
+        for game in game_list {
+            let exposed_match = game.unwrap();
             if exposed_match.owner == *owner {
                 return Some(exposed_match.make_move(player_move));
             }
