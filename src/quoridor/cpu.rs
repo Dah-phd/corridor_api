@@ -57,7 +57,7 @@ impl CpuPlayer {
 
     fn is_cpu_closer_or_rng(&self) -> bool {
         use rand::Rng;
-        let num: usize = rand::thread_rng().gen_range(0..=2);
+        let num: usize = rand::thread_rng().gen_range(0..=1);
         self.cpu_path.len() <= self.player_path.len() + num
     }
 
