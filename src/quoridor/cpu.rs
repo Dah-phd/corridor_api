@@ -11,7 +11,7 @@ impl CpuPlayer {
     pub fn get_cpu_move(game: &Quoridor, only_palyer_moves_allowed: bool) -> PlayerMove {
         let mut instance = Self::new(game.clone());
         let new_position = instance.cpu_path[instance.cpu_path.len() - 2];
-        if !only_palyer_moves_allowed && !instance.is_cpu_closer(new_position) {
+        if !only_palyer_moves_allowed && !instance.is_cpu_closer(new_position) && instance.game.down_player_free_walls != 0 {
             let maybe_wall = instance.get_best_wall();
             if maybe_wall.is_some() {
                 return maybe_wall.unwrap();
@@ -21,8 +21,9 @@ impl CpuPlayer {
     }
 
     fn is_cpu_closer(&self, position: (usize, usize)) -> bool {
-        self.cpu_path.len() < self.player_path.len() && !self.can_enemy_jump_over_cpu(position)
+        self.is_cpu_closer_or_rng() && !self.can_enemy_jump_over_cpu(position)
             || self.can_cpu_jump_over(position)
+            || self.player_wins_next_turn()
     }
 
     fn new(game: Quoridor) -> Self {
@@ -52,6 +53,16 @@ impl CpuPlayer {
 
     fn can_enemy_jump_over_cpu(&self, position: (usize, usize)) -> bool {
         self.get_difference_between_total_positions(position, self.game.up_player) == 1
+    }
+
+    fn is_cpu_closer_or_rng(&self) -> bool {
+        use rand::Rng;
+        let num: usize = rand::thread_rng().gen_range(0..=2);
+        self.cpu_path.len() <= self.player_path.len() + num
+    }
+
+    fn player_wins_next_turn(&self) -> bool {
+        self.player_path.len() == 2
     }
 
     fn get_difference_between_total_positions(&self, position_x: (usize, usize), position_y: (usize, usize)) -> usize {
