@@ -52,9 +52,8 @@ fn join_lobby(
     if owner == quoridor::cpu::CPU {
         return Json(sessions.create_cpu_game(&token.user, MatchType::Quoridor));
     }
-    if let Some(mut lobby) = lobbies.add_player_to_lobby(&owner, &token.user) {
-        if lobby.has_enough_players() {
-            lobby.start();
+    if let Some(lobby) = lobbies.add_player_to_lobby(&owner, &token.user) {
+        if lobby.is_ready() {
             sessions.append(&lobby);
         }
         let _res = lobby_queue.send(lobby);

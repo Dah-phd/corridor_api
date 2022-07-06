@@ -138,16 +138,17 @@ impl Lobby {
         }
     }
 
-    pub fn start(&mut self) {
-        self.game_started = Some(self.owner.to_owned())
+    pub fn is_ready(&self) -> bool {
+        self.game_started.is_some()
+    }
+    fn prepare(&mut self) {
+        if self.match_type.get_expected_players() == self.player_list.len() {
+            self.game_started = Some(self.owner.to_owned())
+        }
     }
 
     pub fn expaired(&self) -> bool {
         self.time_stamp < chrono::Utc::now().timestamp()
-    }
-
-    pub fn has_enough_players(&self) -> bool {
-        self.match_type.get_expected_players() == self.player_list.len()
     }
 }
 
@@ -190,6 +191,7 @@ impl MatchLobbies {
         for lobby in lobbies {
             if &lobby.owner == lobby_owner && !lobby.player_list.contains(player) {
                 lobby.player_list.push(player.to_owned());
+                lobby.prepare();
                 return Some(lobby.clone());
             }
         }
