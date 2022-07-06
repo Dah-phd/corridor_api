@@ -163,18 +163,18 @@ impl MatchLobbies {
         }
     }
 
-    fn drop_expaired(&self) {
+    fn drop_expaired_and_started(&self) {
         let lobbies = &mut *self.lobbies.lock().unwrap();
         lobbies.retain(|x| !x.expaired() && x.game_started.is_none());
     }
 
     pub fn get_all(&self) -> Vec<Lobby> {
-        self.drop_expaired();
+        self.drop_expaired_and_started();
         return self.lobbies.lock().unwrap().clone().to_vec();
     }
 
     pub fn new_lobby(&self, lobby_base: LobbyBase) -> Option<String> {
-        self.drop_expaired();
+        self.drop_expaired_and_started();
         let lobbies = &mut *self.lobbies.lock().unwrap();
         for lobby in lobbies.iter() {
             if lobby.owner == lobby_base.owner {
@@ -186,7 +186,7 @@ impl MatchLobbies {
     }
 
     pub fn add_player_to_lobby(&self, lobby_owner: &String, player: &String) -> Option<Lobby> {
-        self.drop_expaired();
+        self.drop_expaired_and_started();
         let lobbies = &mut *self.lobbies.lock().unwrap();
         for lobby in lobbies {
             if &lobby.owner == lobby_owner && !lobby.player_list.contains(player) {
