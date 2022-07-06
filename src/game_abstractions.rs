@@ -164,7 +164,7 @@ impl MatchLobbies {
 
     fn drop_expaired(&self) {
         let lobbies = &mut *self.lobbies.lock().unwrap();
-        lobbies.retain(|x| !x.expaired());
+        lobbies.retain(|x| !x.expaired() && x.game_started.is_none());
     }
 
     pub fn get_all(&self) -> Vec<Lobby> {
