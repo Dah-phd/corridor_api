@@ -16,7 +16,7 @@ mod quoridor;
 extern crate diesel;
 mod models;
 
-//general
+//chat
 #[post("/chat/sender", data = "<msg>")]
 fn post_message(msg: Json<Message>, token: auth::Token, queue: &State<Sender<Message>>, sessions: &State<ActiveMatchs>) {
     match &msg.id {
@@ -28,6 +28,29 @@ fn post_message(msg: Json<Message>, token: auth::Token, queue: &State<Sender<Mes
         }
     }
     let _res = queue.send(msg.into_inner());
+}
+
+#[get("/game_chat/<owner>")]
+async fn session_chat(
+    owner: String,
+    queue: &State<Sender<Message>>,
+    mut end: rocket::Shutdown,
+) -> rocket::response::stream::EventStream![] {
+    let mut rx = queue.subscribe();
+    rocket::response::stream::EventStream! {
+        loop {
+            let msg = rocket::tokio::select! {
+                msg = rx.recv() => match msg {
+                    Ok(msg) => if msg.id == ChatID::MatchID(owner.to_owned()) {msg} else {continue},
+                    Err(rocket::tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    Err(rocket::tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                },
+                _ = &mut end => break,
+            };
+
+            yield rocket::response::stream::Event::json(&msg);
+        }
+    }
 }
 
 // lobbies
@@ -140,29 +163,6 @@ async fn match_events(
             };
             yield rocket::response::stream::Event::json(&msg);
         };
-    }
-}
-
-#[get("/game_chat/<owner>")]
-async fn session_chat(
-    owner: String,
-    queue: &State<Sender<Message>>,
-    mut end: rocket::Shutdown,
-) -> rocket::response::stream::EventStream![] {
-    let mut rx = queue.subscribe();
-    rocket::response::stream::EventStream! {
-        loop {
-            let msg = rocket::tokio::select! {
-                msg = rx.recv() => match msg {
-                    Ok(msg) => if msg.id == ChatID::MatchID(owner.to_owned()) {msg} else {continue},
-                    Err(rocket::tokio::sync::broadcast::error::RecvError::Closed) => break,
-                    Err(rocket::tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                },
-                _ = &mut end => break,
-            };
-
-            yield rocket::response::stream::Event::json(&msg);
-        }
     }
 }
 
