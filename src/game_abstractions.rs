@@ -18,6 +18,7 @@ pub trait GameMatch {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub enum PlayerMove {
+    Concede(String),
     QuoridorWallV((usize, usize), String),
     QuoridorWallH((usize, usize), String),
     QuoridorMove((usize, usize), String),
@@ -31,6 +32,7 @@ impl PlayerMove {
             Self::QuoridorWallV(_, move_player) => player == move_player,
             Self::QuoridorMove(_, move_player) => player == move_player,
             Self::ChessMove(_, _, move_player) => player == move_player,
+            Self::Concede(move_player) => player == move_player,
         }
     }
 }
@@ -236,11 +238,6 @@ impl ActiveMatchs {
         true
     }
 
-    fn drop_finished(&self) {
-        let game_list = &mut *self.matchs.lock().unwrap();
-        game_list.retain(|x| x.get_winner().is_none())
-    }
-
     pub fn get_match(&self, player: &String) -> Option<Match> {
         let game_list = &mut *self.matchs.lock().unwrap();
         for game in game_list {
@@ -260,6 +257,17 @@ impl ActiveMatchs {
             }
         }
         None
+    }
+
+    pub fn drop(&self, owner: &String) {
+        self.drop_finished();
+        let game_list = &mut *self.matchs.lock().unwrap();
+        game_list.retain(|x| &x.get_owner() != owner)
+    }
+
+    fn drop_finished(&self) {
+        let game_list = &mut *self.matchs.lock().unwrap();
+        game_list.retain(|x| x.get_winner().is_none())
     }
 }
 

@@ -241,6 +241,7 @@ impl GameMatch for QuoridorMatch {
             PlayerMove::QuoridorWallH(val, player) => self.new_h_wall(&player, val),
             PlayerMove::QuoridorWallV(val, player) => self.new_v_wall(&player, val),
             PlayerMove::QuoridorMove(val, player) => self.move_player(&player, val),
+            PlayerMove::Concede(_) => self.concede(),
             _ => PlayerMoveResult::Unknown,
         };
         if result.is_ok() {
@@ -278,6 +279,15 @@ impl QuoridorMatch {
             }
         };
         PlayerMoveResult::Disallowed
+    }
+
+    fn concede(&mut self) -> PlayerMoveResult {
+        if self.current == self.up_player {
+            self.winner = Some(self.down_player.to_owned())
+        } else {
+            self.winner = Some(self.up_player.to_owned())
+        }
+        PlayerMoveResult::Ok
     }
 
     fn check_and_set_winner(&mut self, new_position: &(usize, usize), expected: usize) {

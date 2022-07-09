@@ -55,9 +55,17 @@ async fn session_chat(
 
 // lobbies
 #[post("/create_lobby", data = "<lobby>")]
-fn make_lobby(lobby: Json<LobbyBase>, token: auth::Token, lobbies: &State<MatchLobbies>) -> Json<Option<String>> {
+fn make_lobby(
+    lobby: Json<LobbyBase>,
+    token: auth::Token,
+    lobbies: &State<MatchLobbies>,
+    active_games: &State<ActiveMatchs>,
+) -> Json<Option<String>> {
     if lobby.owner == token.user && !token.is_guest() {
         if let Some(owner) = lobbies.new_lobby(lobby.into_inner()) {
+            if active_games.get_match(&owner).is_some() {
+                active_games.drop(&owner)
+            }
             return Json(Some(owner));
         }
     }
@@ -135,12 +143,13 @@ fn make_move(
 }
 
 #[get("/game_state/<owner>")]
-fn get_game_state_by_owner(owner: String, _auth: auth::Token, active_sessions: &State<ActiveMatchs>) -> Json<Match> {
-    let session_state = active_sessions.get_match(&owner);
-    match session_state {
-        None => Json(Match::NotFound),
-        Some(active_session) => Json(active_session),
+fn get_game_state_by_owner(owner: String, token: auth::Token, active_sessions: &State<ActiveMatchs>) -> Json<Match> {
+    if let Some(game) = active_sessions.get_match(&owner) {
+        if game.contains_player(&token.user) {
+            return Json(game);
+        }
     }
+    Json(Match::NotFound)
 }
 
 #[get("/game_events/<owner>")]
