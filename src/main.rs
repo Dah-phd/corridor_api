@@ -4,10 +4,7 @@ use rocket::serde::json::Json;
 use rocket::tokio::sync::broadcast::Sender;
 use rocket::State;
 mod game_abstractions;
-use game_abstractions::{
-    ActiveMatchs, GameMatch, Lobby, LobbyBase, Match, MatchLobbies, MatchType, PlayerMove, PlayerMoveResult,
-};
-mod a_star_generic;
+use game_abstractions::{ActiveMatchs, Lobby, LobbyBase, Match, MatchLobbies, MatchType, PlayerMove, PlayerMoveResult};
 mod auth;
 mod messages;
 use messages::{ChatID, Message};
@@ -175,23 +172,12 @@ async fn match_events(
     }
 }
 
-#[get("/quoridor-test")]
-fn test_quoridor_board() -> Json<Match> {
-    let pl_ls = vec!["a".to_owned(), "b".to_owned()];
-    let mut quoridor = quoridor::QuoridorMatch::new(&pl_ls, "a".to_owned());
-    quoridor.make_move(PlayerMove::QuoridorWallH((2, 2), "a".to_owned()));
-    quoridor.make_move(PlayerMove::QuoridorWallV((5, 5), "b".to_owned()));
-    quoridor.make_move(PlayerMove::QuoridorMove((1, 4), "a".to_owned()));
-    return Json(Match::ActiveQuoridor(quoridor));
-}
-
 #[launch]
 fn rocket() -> _ {
     rocket::build()
         .mount(
             "/",
             routes![
-                test_quoridor_board,
                 auth::login,
                 auth::register,
                 auth::get_user_name_from_token,

@@ -3,6 +3,12 @@
 version = 3
 
 [[package]]
+name = "a-star_traitbased"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2058d863140d4ee07863eab6129a52dae378a902ccc05abd3ba73f4809c38cde"
+
+[[package]]
 name = "aead"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -243,6 +249,7 @@ dependencies = [
 name = "corridor_api"
 version = "0.1.0"
 dependencies = [
+ "a-star_traitbased",
  "chrono",
  "diesel",
  "jsonwebtoken",
