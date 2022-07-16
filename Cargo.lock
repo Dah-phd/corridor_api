@@ -4,9 +4,9 @@ version = 3
 
 [[package]]
 name = "a-star_traitbased"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2058d863140d4ee07863eab6129a52dae378a902ccc05abd3ba73f4809c38cde"
+checksum = "8831de60628678a7a360226e14f24ca25c61c353daef06def33aa772c1dbb793"
 
 [[package]]
 name = "aead"
