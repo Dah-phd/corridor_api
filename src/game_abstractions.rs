@@ -60,12 +60,14 @@ impl PlayerMoveResult {
 #[serde(crate = "rocket::serde")]
 pub enum MatchType {
     Quoridor,
+    Unknown,
 }
 
 impl MatchType {
     pub fn get_expected_players(&self) -> usize {
         match self {
             Self::Quoridor => 2,
+            _ => 0,
         }
     }
 }
@@ -81,6 +83,7 @@ impl Match {
     pub fn new(player_list: &Vec<String>, owner: &str, match_type: MatchType) -> Option<Self> {
         match match_type {
             MatchType::Quoridor => Some(Self::ActiveQuoridor(QuoridorMatch::new(player_list, owner.to_owned()))),
+            _ => None,
         }
     }
     pub fn get_owner(&self) -> String {
@@ -92,7 +95,7 @@ impl Match {
 
     pub fn unwrap(&mut self) -> &mut QuoridorMatch {
         match self {
-            Match::ActiveQuoridor(v) => v,
+            Match::ActiveQuoridor(game) => game,
             _ => panic!("NotFound method called!"),
         }
     }
@@ -116,7 +119,7 @@ impl Match {
 #[serde(crate = "rocket::serde")]
 pub struct LobbyBase {
     pub owner: String,
-    game: MatchType,
+    pub game: MatchType,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -198,6 +201,11 @@ impl MatchLobbies {
             }
         }
         None
+    }
+
+    pub fn drop(&self, lobby_owner: &String) {
+        let lobbies = &mut *self.lobbies.lock().unwrap();
+        lobbies.retain(|x| &x.owner != lobby_owner);
     }
 }
 

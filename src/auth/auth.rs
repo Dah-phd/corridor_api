@@ -1,5 +1,4 @@
 use crate::models::UserModel;
-
 extern crate chrono;
 extern crate jsonwebtoken;
 extern crate rocket;

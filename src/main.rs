@@ -51,15 +51,18 @@ async fn session_chat(
 }
 
 // lobbies
-#[post("/create_lobby", data = "<lobby>")]
+#[post("/create_lobby", data = "<lobby_base>")]
 fn make_lobby(
-    lobby: Json<LobbyBase>,
+    lobby_base: Json<LobbyBase>,
     token: auth::Token,
     lobbies: &State<MatchLobbies>,
     active_games: &State<ActiveMatchs>,
 ) -> Json<Option<String>> {
-    if lobby.owner == token.user && !token.is_guest() {
-        if let Some(owner) = lobbies.new_lobby(lobby.into_inner()) {
+    let lobby = lobby_base.into_inner();
+    if let MatchType::Unknown = lobby.game {
+        lobbies.drop(&token.user);
+    } else if lobby.owner == token.user && !token.is_guest() {
+        if let Some(owner) = lobbies.new_lobby(lobby) {
             if active_games.get_match(&owner).is_some() {
                 active_games.drop(&owner)
             }
@@ -97,6 +100,7 @@ fn get_all_lobbies(lobbies: &State<MatchLobbies>, _auth: auth::Token) -> Json<Ve
 
 #[get("/lobby_events/<owner>")]
 async fn lobby_events(
+    _token: auth::Token,
     owner: String,
     queue: &State<Sender<Lobby>>,
     mut end: rocket::Shutdown,
@@ -141,8 +145,10 @@ fn make_move(
 
 #[get("/game_state/<owner>")]
 fn get_game_state_by_owner(owner: String, token: auth::Token, active_sessions: &State<ActiveMatchs>) -> Json<Match> {
-    if let Some(game) = active_sessions.get_match(&owner) {
+    if let Some(mut game) = active_sessions.get_match(&owner) {
         if game.contains_player(&token.user) {
+            game.unwrap().timer_enforced_concede();
+            println!("{:?}", game);
             return Json(game);
         }
     }

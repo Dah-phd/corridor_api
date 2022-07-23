@@ -1,6 +1,7 @@
 extern crate a_star_traitbased;
 extern crate rocket;
 use crate::game_abstractions::{GameMatch, MatchType, PlayerMove, PlayerMoveResult};
+use chrono;
 use rocket::serde::Serialize;
 pub mod cpu;
 
@@ -204,6 +205,8 @@ impl a_star_traitbased::PathGenerator for Quoridor {
 pub struct QuoridorMatch {
     #[serde(skip_serializing)]
     pub owner: String,
+    #[serde(skip_serializing)]
+    timestamp: i64,
     up_player: String,
     down_player: String,
     game: Quoridor,
@@ -219,6 +222,7 @@ impl GameMatch for QuoridorMatch {
     fn new(player_list: &Vec<String>, owner: String) -> Self {
         QuoridorMatch {
             up_player: player_list[0].to_owned(),
+            timestamp: chrono::Utc::now().timestamp(),
             down_player: if player_list.len() >= 2 {
                 player_list[1].to_owned()
             } else {
@@ -237,6 +241,7 @@ impl GameMatch for QuoridorMatch {
         if self.winner.is_some() {
             return PlayerMoveResult::GameFinished;
         }
+        self.refresh_move_timer();
         let result = match player_move {
             PlayerMove::QuoridorWallH(val, player) => self.new_h_wall(&player, val),
             PlayerMove::QuoridorWallV(val, player) => self.new_v_wall(&player, val),
@@ -288,6 +293,12 @@ impl QuoridorMatch {
             self.winner = Some(self.up_player.to_owned())
         }
         PlayerMoveResult::Ok
+    }
+
+    pub fn timer_enforced_concede(&mut self) {
+        if (self.timestamp + 180) < chrono::Utc::now().timestamp() {
+            self.concede();
+        }
     }
 
     fn check_and_set_winner(&mut self, new_position: &(usize, usize), expected: usize) {
@@ -359,6 +370,10 @@ impl QuoridorMatch {
         } else {
             self.current = self.up_player.to_owned()
         }
+    }
+
+    fn refresh_move_timer(&mut self) {
+        self.timestamp = chrono::Utc::now().timestamp();
     }
 
     fn cpu_player_move(&mut self) {
