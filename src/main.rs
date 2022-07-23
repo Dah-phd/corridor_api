@@ -148,7 +148,6 @@ fn get_game_state_by_owner(owner: String, token: auth::Token, active_sessions: &
     if let Some(mut game) = active_sessions.get_match(&owner) {
         if game.contains_player(&token.user) {
             game.unwrap().timer_enforced_concede();
-            println!("{:?}", game);
             return Json(game);
         }
     }
