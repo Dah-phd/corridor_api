@@ -1,6 +1,6 @@
 extern crate a_star_traitbased;
 extern crate rocket;
-use crate::game_abstractions::{GameMatch, MatchType, PlayerMove, PlayerMoveResult};
+use crate::game_matches::{GameMatch, MatchType, PlayerMove, PlayerMoveResult};
 use chrono;
 use rocket::serde::Serialize;
 pub mod cpu;
