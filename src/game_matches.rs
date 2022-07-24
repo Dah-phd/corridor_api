@@ -1,15 +1,12 @@
 use rocket::serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-extern crate rand;
-use crate::game_lobbies::Lobby;
-use chrono;
-use rand::{distributions::Alphanumeric, Rng};
 // importing Matchs for each game
 use crate::quoridor::QuoridorMatch;
+extern crate rand;
+use crate::game_lobbies::Lobby;
+use rand::{distributions::Alphanumeric, Rng};
 
-const AFK_CONCEDE_TIMER: i64 = 180;
-
-pub trait GameInterface {
+pub trait GameMatch {
     type Position;
     type Spec;
     fn new(player_list: &Vec<String>, owner: String) -> Self;
@@ -17,6 +14,7 @@ pub trait GameInterface {
     fn contains_player(&self, player: &str) -> bool;
     fn get_type(&self) -> MatchType;
     fn get_winner(&self) -> Option<String>;
+    fn is_expaired(&self) -> bool;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -78,73 +76,58 @@ impl MatchType {
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(crate = "rocket::serde")]
-pub enum GenericGame {
+pub enum Match {
     ActiveQuoridor(QuoridorMatch),
     NotFound,
 }
 
-impl GenericGame {
-    pub fn new(player_list: &Vec<String>, owner: &str, game_type: MatchType) -> Option<Self> {
-        match game_type {
+impl Match {
+    pub fn new(player_list: &Vec<String>, owner: &str, match_type: MatchType) -> Option<Self> {
+        match match_type {
             MatchType::Quoridor => Some(Self::ActiveQuoridor(QuoridorMatch::new(player_list, owner.to_owned()))),
             _ => None,
         }
     }
-
-    pub fn unwrap_mut(&mut self) -> &mut QuoridorMatch {
-        match self {
-            GenericGame::ActiveQuoridor(game) => game,
-            _ => panic!("NotFound method called!"),
-        }
-    }
-
-    pub fn unwrap(&self) -> &QuoridorMatch {
-        match self {
-            GenericGame::ActiveQuoridor(game) => game,
-            _ => panic!("NotFound method called!"),
-        }
-    }
-}
-
-pub struct Match {
-    pub game: GenericGame,
-    timestamp: i64,
-}
-
-impl Match {
-    pub fn new(player_list: &Vec<String>, owner: &str, game_type: MatchType) -> Option<Self> {
-        if let Some(game) = GenericGame::new(player_list, owner, game_type) {
-            return Some(Self {
-                game,
-                timestamp: chrono::Utc::now().timestamp(),
-            });
-        }
-        None
-    }
-
-    fn is_expaired(&self) -> bool {
-        self.timestamp + AFK_CONCEDE_TIMER + 30 < chrono::Utc::now().timestamp()
-    }
-
-    fn refresh_move_timer(&mut self) {
-        self.timestamp = chrono::Utc::now().timestamp();
-    }
-
     pub fn get_owner(&self) -> String {
-        self.game.unwrap().owner.to_owned()
+        match self {
+            Match::ActiveQuoridor(game) => return game.owner.to_owned(),
+            _ => panic!("NotFound method called!"),
+        }
     }
 
-    fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult {
-        self.refresh_move_timer();
-        self.game.unwrap_mut().make_move(player_move)
+    pub fn unwrap(&mut self) -> &mut QuoridorMatch {
+        match self {
+            Match::ActiveQuoridor(game) => game,
+            _ => panic!("NotFound method called!"),
+        }
+    }
+
+    pub fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult {
+        match self {
+            Match::ActiveQuoridor(game) => game.make_move(player_move),
+            _ => panic!("NotFound method called!"),
+        }
     }
 
     pub fn contains_player(&self, player: &String) -> bool {
-        self.game.unwrap().contains_player(player)
+        match self {
+            Match::ActiveQuoridor(game) => game.contains_player(player),
+            _ => panic!("NotFound method called!"),
+        }
+    }
+
+    fn is_expaired(&self) -> bool {
+        match self {
+            Match::ActiveQuoridor(game) => game.is_expaired(),
+            _ => panic!("NotFound method called!"),
+        }
     }
 
     fn get_winner(&self) -> Option<String> {
-        self.game.unwrap().get_winner()
+        match self {
+            Match::ActiveQuoridor(game) => game.get_winner(),
+            _ => panic!("NotFound method called!"),
+        }
     }
 }
 
@@ -178,19 +161,18 @@ impl ActiveMatchs {
         self.drop_finished();
         let game_list = &mut *self.matchs.lock().unwrap();
         let new_game = Match::new(&lobby.player_list, &lobby.player_list[0], lobby.match_type);
-        if let Some(game) = new_game {
-            game_list.push(game);
-            return true;
+        if new_game.is_none() {
+            return false;
         }
-        false
+        game_list.push(new_game.unwrap());
+        true
     }
 
-    pub fn get_match_by_player(&self, player: &String) -> Option<GenericGame> {
+    pub fn get_match_by_player(&self, player: &String) -> Option<Match> {
         let game_list = &mut *self.matchs.lock().unwrap();
         for game in game_list {
-            if game.contains_player(player) {
-                if game.is_expaired() {}
-                return Some(game.game.clone());
+            if game.unwrap().contains_player(player) {
+                return Some(game.clone());
             }
         }
         None
