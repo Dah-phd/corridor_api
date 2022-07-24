@@ -189,6 +189,7 @@ impl ActiveMatchs {
         let game_list = &mut *self.matchs.lock().unwrap();
         for game in game_list {
             if game.contains_player(player) {
+                if game.is_expaired() {}
                 return Some(game.game.clone());
             }
         }

@@ -1,5 +1,7 @@
 #[macro_use]
 extern crate rocket;
+use std::any::TypeId;
+
 use rocket::serde::json::Json;
 use rocket::tokio::sync::broadcast::Sender;
 use rocket::State;
