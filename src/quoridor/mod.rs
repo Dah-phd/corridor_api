@@ -1,10 +1,8 @@
 extern crate a_star_traitbased;
 extern crate rocket;
-use crate::game_matches::{GameMatch, MatchType, PlayerMove, PlayerMoveResult};
-use chrono;
+use crate::game_interface::{GenericGameInterface, PlayerMove, PlayerMoveResult};
 use rocket::serde::Serialize;
 pub mod cpu;
-const AFK_CONCEDE_TIMER: i64 = 180;
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(crate = "rocket::serde")]
@@ -217,13 +215,13 @@ pub struct QuoridorMatch {
     only_player_moves_allowed: bool,
 }
 
-impl GameMatch for QuoridorMatch {
+impl GenericGameInterface for QuoridorMatch {
     type Position = (usize, usize);
     type Spec = ();
-    fn new(player_list: &Vec<String>, owner: String) -> Self {
+    fn new(player_list: &Vec<String>, owner: String, timestamp: i64) -> Self {
         QuoridorMatch {
             up_player: player_list[0].to_owned(),
-            timestamp: chrono::Utc::now().timestamp(),
+            timestamp,
             down_player: if player_list.len() >= 2 {
                 player_list[1].to_owned()
             } else {
@@ -242,7 +240,6 @@ impl GameMatch for QuoridorMatch {
         if self.winner.is_some() {
             return PlayerMoveResult::GameFinished;
         }
-        self.refresh_move_timer();
         let result = match player_move {
             PlayerMove::QuoridorWallH(val, player) => self.new_h_wall(&player, val),
             PlayerMove::QuoridorWallV(val, player) => self.new_v_wall(&player, val),
@@ -260,16 +257,19 @@ impl GameMatch for QuoridorMatch {
         self.winner.clone()
     }
 
-    fn is_expaired(&self) -> bool {
-        self.timestamp + AFK_CONCEDE_TIMER + 30 < chrono::Utc::now().timestamp()
-    }
-
     fn contains_player(&self, player: &str) -> bool {
         self.up_player == player || self.down_player == player || self.owner == player
     }
 
-    fn get_type(&self) -> MatchType {
-        return MatchType::Quoridor;
+    fn get_timestamp(&self) -> i64 {
+        self.timestamp
+    }
+    fn set_timestamp(&mut self, timestamp: i64) {
+        self.timestamp = timestamp
+    }
+
+    fn get_current_player(&self) -> &String {
+        &self.current
     }
 }
 
@@ -299,12 +299,6 @@ impl QuoridorMatch {
             self.winner = Some(self.up_player.to_owned())
         }
         PlayerMoveResult::Ok
-    }
-
-    pub fn timer_enforced_concede(&mut self) {
-        if (self.timestamp + AFK_CONCEDE_TIMER) < chrono::Utc::now().timestamp() {
-            self.concede();
-        }
     }
 
     fn check_and_set_winner(&mut self, new_position: &(usize, usize), expected: usize) {
@@ -376,10 +370,6 @@ impl QuoridorMatch {
         } else {
             self.current = self.up_player.to_owned()
         }
-    }
-
-    fn refresh_move_timer(&mut self) {
-        self.timestamp = chrono::Utc::now().timestamp();
     }
 
     fn cpu_player_move(&mut self) {
@@ -462,7 +452,7 @@ mod test {
 
     #[test]
     fn new_match_player_moves() {
-        let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned(), "pl2".to_owned()], "pl1".to_owned());
+        let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned(), "pl2".to_owned()], "pl1".to_owned(), 0);
         assert!(new_game.make_move(PlayerMove::QuoridorMove((1, 4), "pl1".to_owned())).is_ok());
         assert_eq!(new_game.current, "pl2");
         assert!(new_game.make_move(PlayerMove::QuoridorMove((8, 5), "pl2".to_owned())).is_ok());
@@ -471,7 +461,7 @@ mod test {
 
     #[test]
     fn new_match_make_borders() {
-        let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned(), "pl2".to_owned()], "pl1".to_owned());
+        let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned(), "pl2".to_owned()], "pl1".to_owned(), 0);
         assert!(new_game
             .make_move(PlayerMove::QuoridorWallH((1, 0), "pl1".to_owned()))
             .is_ok());
@@ -500,7 +490,7 @@ mod test {
 
     #[test]
     fn test_cpu() {
-        let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned()], "pl1".to_owned());
+        let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned()], "pl1".to_owned(), 0);
         new_game.make_move(PlayerMove::QuoridorMove((1, 4), "pl1".to_owned()));
         let cpu_move = cpu::CpuPlayer::get_cpu_move(&new_game.game, false);
         if let PlayerMove::QuoridorWallH(position, _) = cpu_move {

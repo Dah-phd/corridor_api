@@ -1,21 +1,20 @@
+use crate::game_matches::GameType;
 use rocket::serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-// importing Matchs for each game
-use crate::game_matches::MatchType;
 extern crate rand;
 
 #[derive(Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct LobbyBase {
     pub owner: String,
-    pub game: MatchType,
+    pub game: GameType,
 }
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(crate = "rocket::serde")]
 pub struct Lobby {
     pub owner: String,
-    pub match_type: MatchType,
+    pub match_type: GameType,
     pub player_list: Vec<String>,
     game_started: Option<String>,
     time_stamp: i64,

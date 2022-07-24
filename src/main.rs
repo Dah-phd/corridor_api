@@ -4,9 +4,11 @@ use rocket::serde::json::Json;
 use rocket::tokio::sync::broadcast::Sender;
 use rocket::State;
 mod game_matches;
-use game_matches::{ActiveMatchs, Match, MatchType, PlayerMove, PlayerMoveResult};
+use game_matches::{ActiveGames, GameType};
 mod game_lobbies;
 use game_lobbies::{Lobby, LobbyBase, MatchLobbies};
+mod game_interface;
+use game_interface::{GenericGame, PlayerMove, PlayerMoveResult};
 mod auth;
 mod messages;
 use messages::{ChatID, Message};
@@ -17,7 +19,7 @@ mod models;
 
 //chat
 #[post("/chat/sender", data = "<msg>")]
-fn post_message(msg: Json<Message>, token: auth::Token, queue: &State<Sender<Message>>, sessions: &State<ActiveMatchs>) {
+fn post_message(msg: Json<Message>, token: auth::Token, queue: &State<Sender<Message>>, sessions: &State<ActiveGames>) {
     match &msg.id {
         ChatID::MatchID(owner) => {
             let lobby = sessions.get_match_by_player(&owner);
@@ -58,10 +60,10 @@ fn make_lobby(
     lobby_base: Json<LobbyBase>,
     token: auth::Token,
     lobbies: &State<MatchLobbies>,
-    active_games: &State<ActiveMatchs>,
+    active_games: &State<ActiveGames>,
 ) -> Json<Option<String>> {
     let lobby = lobby_base.into_inner();
-    if let MatchType::Unknown = lobby.game {
+    if let GameType::Unknown = lobby.game {
         lobbies.drop(&token.user);
     } else if lobby.owner == token.user && !token.is_guest() {
         if let Some(owner) = lobbies.new_lobby(lobby) {
@@ -79,11 +81,11 @@ fn join_lobby(
     owner: String,
     token: auth::Token,
     lobbies: &State<MatchLobbies>,
-    sessions: &State<ActiveMatchs>,
+    sessions: &State<ActiveGames>,
     lobby_queue: &State<Sender<Lobby>>,
 ) -> Json<Option<String>> {
     if owner == quoridor::cpu::CPU {
-        return Json(sessions.create_cpu_game(&token.user, MatchType::Quoridor));
+        return Json(sessions.create_cpu_game(&token.user, GameType::Quoridor));
     }
     if let Some(lobby) = lobbies.add_player_to_lobby(&owner, &token.user) {
         if lobby.is_ready() {
@@ -128,9 +130,9 @@ async fn lobby_events(
 fn make_move(
     owner: String,
     player_move: Json<PlayerMove>,
-    sessions: &State<ActiveMatchs>,
+    sessions: &State<ActiveGames>,
     token: auth::Token,
-    queue: &State<Sender<Match>>,
+    queue: &State<Sender<GenericGame>>,
 ) -> Json<PlayerMoveResult> {
     if !player_move.confirm_player(&token.user) {
         return Json(PlayerMoveResult::Unauthorized);
@@ -146,20 +148,19 @@ fn make_move(
 }
 
 #[get("/game_state/<owner>")]
-fn get_game_state_by_owner(owner: String, token: auth::Token, active_sessions: &State<ActiveMatchs>) -> Json<Match> {
-    if let Some(mut game) = active_sessions.get_match_by_player(&owner) {
+fn get_game_state_by_owner(owner: String, token: auth::Token, active_sessions: &State<ActiveGames>) -> Json<GenericGame> {
+    if let Some(game) = active_sessions.get_match_by_player(&owner) {
         if game.contains_player(&token.user) {
-            game.unwrap().timer_enforced_concede();
             return Json(game);
         }
     }
-    Json(Match::NotFound)
+    Json(GenericGame::NotFound)
 }
 
 #[get("/game_events/<owner>")]
 async fn match_events(
     owner: String,
-    queue: &State<Sender<Match>>,
+    queue: &State<Sender<GenericGame>>,
     _auth: auth::Token,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
@@ -202,8 +203,8 @@ fn rocket() -> _ {
         .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static/build")))
         .register("/", catchers![auth::forbidden])
         .manage(rocket::tokio::sync::broadcast::channel::<Message>(1024).0)
-        .manage(rocket::tokio::sync::broadcast::channel::<Match>(1024).0)
-        .manage(ActiveMatchs::new())
+        .manage(rocket::tokio::sync::broadcast::channel::<GenericGame>(1024).0)
+        .manage(ActiveGames::new())
         .manage(rocket::tokio::sync::broadcast::channel::<Lobby>(1024).0)
         .manage(MatchLobbies::new())
         .manage(models::DBLink::new("./db.sqlite3"))
