@@ -13,6 +13,7 @@ pub trait GameMatch {
     fn contains_player(&self, player: &str) -> bool;
     fn get_type(&self) -> MatchType;
     fn get_winner(&self) -> Option<String>;
+    fn is_expaired(&self) -> bool;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -103,6 +104,13 @@ impl Match {
     pub fn contains_player(&self, player: &String) -> bool {
         match self {
             Match::ActiveQuoridor(game) => game.contains_player(player),
+            _ => panic!("NotFound method called!"),
+        }
+    }
+
+    fn is_expaired(&self) -> bool {
+        match self {
+            Match::ActiveQuoridor(game) => game.is_expaired(),
             _ => panic!("NotFound method called!"),
         }
     }
@@ -246,7 +254,7 @@ impl ActiveMatchs {
         true
     }
 
-    pub fn get_match(&self, player: &String) -> Option<Match> {
+    pub fn get_match_by_player(&self, player: &String) -> Option<Match> {
         let game_list = &mut *self.matchs.lock().unwrap();
         for game in game_list {
             if game.unwrap().contains_player(player) {
@@ -267,7 +275,7 @@ impl ActiveMatchs {
         None
     }
 
-    pub fn drop(&self, owner: &String) {
+    pub fn drop_by_owner(&self, owner: &String) {
         self.drop_finished();
         let game_list = &mut *self.matchs.lock().unwrap();
         game_list.retain(|x| &x.get_owner() != owner)
@@ -275,7 +283,7 @@ impl ActiveMatchs {
 
     fn drop_finished(&self) {
         let game_list = &mut *self.matchs.lock().unwrap();
-        game_list.retain(|x| x.get_winner().is_none())
+        game_list.retain(|x| x.get_winner().is_none() || !x.is_expaired())
     }
 }
 

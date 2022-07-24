@@ -18,7 +18,7 @@ mod models;
 fn post_message(msg: Json<Message>, token: auth::Token, queue: &State<Sender<Message>>, sessions: &State<ActiveMatchs>) {
     match &msg.id {
         ChatID::MatchID(owner) => {
-            let lobby = sessions.get_match(&owner);
+            let lobby = sessions.get_match_by_player(&owner);
             if !lobby.is_some() || !lobby.unwrap().contains_player(&token.user) {
                 return;
             }
@@ -63,8 +63,8 @@ fn make_lobby(
         lobbies.drop(&token.user);
     } else if lobby.owner == token.user && !token.is_guest() {
         if let Some(owner) = lobbies.new_lobby(lobby) {
-            if active_games.get_match(&owner).is_some() {
-                active_games.drop(&owner)
+            if active_games.get_match_by_player(&owner).is_some() {
+                active_games.drop_by_owner(&owner)
             }
             return Json(Some(owner));
         }
@@ -138,14 +138,14 @@ fn make_move(
         None => return Json(PlayerMoveResult::Unknown),
     };
     if let PlayerMoveResult::Ok = move_result {
-        let _ = queue.send(sessions.get_match(&owner).unwrap());
+        let _ = queue.send(sessions.get_match_by_player(&owner).unwrap());
     }
     Json(move_result)
 }
 
 #[get("/game_state/<owner>")]
 fn get_game_state_by_owner(owner: String, token: auth::Token, active_sessions: &State<ActiveMatchs>) -> Json<Match> {
-    if let Some(mut game) = active_sessions.get_match(&owner) {
+    if let Some(mut game) = active_sessions.get_match_by_player(&owner) {
         if game.contains_player(&token.user) {
             game.unwrap().timer_enforced_concede();
             return Json(game);

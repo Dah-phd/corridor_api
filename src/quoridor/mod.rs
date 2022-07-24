@@ -4,6 +4,7 @@ use crate::game_abstractions::{GameMatch, MatchType, PlayerMove, PlayerMoveResul
 use chrono;
 use rocket::serde::Serialize;
 pub mod cpu;
+const AFK_CONCEDE_TIMER: i64 = 180;
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(crate = "rocket::serde")]
@@ -259,9 +260,14 @@ impl GameMatch for QuoridorMatch {
         self.winner.clone()
     }
 
+    fn is_expaired(&self) -> bool {
+        self.timestamp + AFK_CONCEDE_TIMER + 30 < chrono::Utc::now().timestamp()
+    }
+
     fn contains_player(&self, player: &str) -> bool {
         self.up_player == player || self.down_player == player || self.owner == player
     }
+
     fn get_type(&self) -> MatchType {
         return MatchType::Quoridor;
     }
@@ -296,7 +302,7 @@ impl QuoridorMatch {
     }
 
     pub fn timer_enforced_concede(&mut self) {
-        if (self.timestamp + 180) < chrono::Utc::now().timestamp() {
+        if (self.timestamp + AFK_CONCEDE_TIMER) < chrono::Utc::now().timestamp() {
             self.concede();
         }
     }
