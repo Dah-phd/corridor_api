@@ -4,7 +4,7 @@ use rocket::serde::json::Json;
 use rocket::tokio::sync::broadcast::Sender;
 use rocket::State;
 mod game_matches;
-use game_matches::{ActiveMatchs, Match, MatchType, PlayerMove, PlayerMoveResult};
+use game_matches::{ActiveMatchs, GameInterface, GenericGame, MatchType, PlayerMove, PlayerMoveResult};
 mod game_lobbies;
 use game_lobbies::{Lobby, LobbyBase, MatchLobbies};
 mod auth;
@@ -21,7 +21,7 @@ fn post_message(msg: Json<Message>, token: auth::Token, queue: &State<Sender<Mes
     match &msg.id {
         ChatID::MatchID(owner) => {
             let lobby = sessions.get_match_by_player(&owner);
-            if !lobby.is_some() || !lobby.unwrap().contains_player(&token.user) {
+            if !lobby.is_some() || !lobby.unwrap().unwrap().contains_player(&token.user) {
                 return;
             }
         }
@@ -130,7 +130,7 @@ fn make_move(
     player_move: Json<PlayerMove>,
     sessions: &State<ActiveMatchs>,
     token: auth::Token,
-    queue: &State<Sender<Match>>,
+    queue: &State<Sender<GenericGame>>,
 ) -> Json<PlayerMoveResult> {
     if !player_move.confirm_player(&token.user) {
         return Json(PlayerMoveResult::Unauthorized);
@@ -146,20 +146,20 @@ fn make_move(
 }
 
 #[get("/game_state/<owner>")]
-fn get_game_state_by_owner(owner: String, token: auth::Token, active_sessions: &State<ActiveMatchs>) -> Json<Match> {
-    if let Some(mut game) = active_sessions.get_match_by_player(&owner) {
+fn get_game_state_by_owner(owner: String, token: auth::Token, active_sessions: &State<ActiveMatchs>) -> Json<GenericGame> {
+    if let Some(generic_game) = active_sessions.get_match_by_player(&owner) {
+        let game = generic_game.unwrap();
         if game.contains_player(&token.user) {
-            game.unwrap().timer_enforced_concede();
-            return Json(game);
+            return Json(generic_game);
         }
     }
-    Json(Match::NotFound)
+    Json(GenericGame::NotFound)
 }
 
 #[get("/game_events/<owner>")]
 async fn match_events(
     owner: String,
-    queue: &State<Sender<Match>>,
+    queue: &State<Sender<GenericGame>>,
     _auth: auth::Token,
     mut end: rocket::Shutdown,
 ) -> rocket::response::stream::EventStream![] {
@@ -168,7 +168,7 @@ async fn match_events(
         loop {
             let msg = rocket::tokio::select! {
                 msg = rx.recv() => match msg {
-                    Ok(msg) => if msg.get_owner() == owner {msg} else {continue},
+                    Ok(msg) => if msg.unwrap().owner == owner {msg} else {continue},
                     Err(rocket::tokio::sync::broadcast::error::RecvError::Closed) => break,
                     Err(rocket::tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
                 },
@@ -202,7 +202,7 @@ fn rocket() -> _ {
         .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static/build")))
         .register("/", catchers![auth::forbidden])
         .manage(rocket::tokio::sync::broadcast::channel::<Message>(1024).0)
-        .manage(rocket::tokio::sync::broadcast::channel::<Match>(1024).0)
+        .manage(rocket::tokio::sync::broadcast::channel::<GenericGame>(1024).0)
         .manage(ActiveMatchs::new())
         .manage(rocket::tokio::sync::broadcast::channel::<Lobby>(1024).0)
         .manage(MatchLobbies::new())

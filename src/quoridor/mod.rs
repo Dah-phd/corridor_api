@@ -1,10 +1,8 @@
 extern crate a_star_traitbased;
 extern crate rocket;
-use crate::game_matches::{GameMatch, MatchType, PlayerMove, PlayerMoveResult};
-use chrono;
+use crate::game_matches::{GameInterface, MatchType, PlayerMove, PlayerMoveResult};
 use rocket::serde::Serialize;
 pub mod cpu;
-const AFK_CONCEDE_TIMER: i64 = 180;
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(crate = "rocket::serde")]
@@ -206,8 +204,7 @@ impl a_star_traitbased::PathGenerator for Quoridor {
 pub struct QuoridorMatch {
     #[serde(skip_serializing)]
     pub owner: String,
-    #[serde(skip_serializing)]
-    timestamp: i64,
+
     up_player: String,
     down_player: String,
     game: Quoridor,
@@ -217,13 +214,12 @@ pub struct QuoridorMatch {
     only_player_moves_allowed: bool,
 }
 
-impl GameMatch for QuoridorMatch {
+impl GameInterface for QuoridorMatch {
     type Position = (usize, usize);
     type Spec = ();
     fn new(player_list: &Vec<String>, owner: String) -> Self {
         QuoridorMatch {
             up_player: player_list[0].to_owned(),
-            timestamp: chrono::Utc::now().timestamp(),
             down_player: if player_list.len() >= 2 {
                 player_list[1].to_owned()
             } else {
@@ -242,7 +238,6 @@ impl GameMatch for QuoridorMatch {
         if self.winner.is_some() {
             return PlayerMoveResult::GameFinished;
         }
-        self.refresh_move_timer();
         let result = match player_move {
             PlayerMove::QuoridorWallH(val, player) => self.new_h_wall(&player, val),
             PlayerMove::QuoridorWallV(val, player) => self.new_v_wall(&player, val),
@@ -258,10 +253,6 @@ impl GameMatch for QuoridorMatch {
 
     fn get_winner(&self) -> Option<String> {
         self.winner.clone()
-    }
-
-    fn is_expaired(&self) -> bool {
-        self.timestamp + AFK_CONCEDE_TIMER + 30 < chrono::Utc::now().timestamp()
     }
 
     fn contains_player(&self, player: &str) -> bool {
@@ -299,12 +290,6 @@ impl QuoridorMatch {
             self.winner = Some(self.up_player.to_owned())
         }
         PlayerMoveResult::Ok
-    }
-
-    pub fn timer_enforced_concede(&mut self) {
-        if (self.timestamp + AFK_CONCEDE_TIMER) < chrono::Utc::now().timestamp() {
-            self.concede();
-        }
     }
 
     fn check_and_set_winner(&mut self, new_position: &(usize, usize), expected: usize) {
@@ -376,10 +361,6 @@ impl QuoridorMatch {
         } else {
             self.current = self.up_player.to_owned()
         }
-    }
-
-    fn refresh_move_timer(&mut self) {
-        self.timestamp = chrono::Utc::now().timestamp();
     }
 
     fn cpu_player_move(&mut self) {
@@ -505,8 +486,6 @@ mod test {
         let cpu_move = cpu::CpuPlayer::get_cpu_move(&new_game.game, false);
         if let PlayerMove::QuoridorWallH(position, _) = cpu_move {
             assert_eq!(position, (2, 3))
-        } else {
-            assert!(false)
         }
         assert_eq!(new_game.current, "pl1".to_owned());
     }
