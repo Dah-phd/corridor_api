@@ -92,8 +92,3 @@ pub fn register(
         _ => UNAUTHORIZED,
     }
 }
-
-#[catch(403)]
-pub fn forbidden(_: &rocket::Request) -> Json<UserResult<String>> {
-    UNAUTHORIZED
-}

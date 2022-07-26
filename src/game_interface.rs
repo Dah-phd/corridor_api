@@ -77,7 +77,6 @@ impl PlayerMoveResult {
 #[serde(crate = "rocket::serde")]
 pub enum GenericGame {
     ActiveQuoridor(QuoridorMatch),
-    NotFound,
 }
 
 impl GenericGame {
@@ -94,7 +93,6 @@ impl GenericGame {
     pub fn get_owner(&self) -> String {
         match self {
             GenericGame::ActiveQuoridor(game) => return game.owner.to_owned(),
-            _ => panic!("NotFound method called!"),
         }
     }
 
@@ -104,35 +102,30 @@ impl GenericGame {
                 game.refresh_timestamp();
                 game.make_move(player_move)
             }
-            _ => panic!("NotFound method called!"),
         }
     }
 
     pub fn contains_player(&self, player: &String) -> bool {
         match self {
             GenericGame::ActiveQuoridor(game) => game.contains_player(player),
-            _ => panic!("NotFound method called!"),
         }
     }
 
     pub fn is_expaired(&self) -> bool {
         match self {
             GenericGame::ActiveQuoridor(game) => game.is_expaired(),
-            _ => panic!("NotFound method called!"),
         }
     }
 
     pub fn get_winner(&self) -> Option<String> {
         match self {
             GenericGame::ActiveQuoridor(game) => game.get_winner(),
-            _ => panic!("NotFound method called!"),
         }
     }
 
     pub fn timeout_guard(&mut self, player: &String) {
         match self {
             GenericGame::ActiveQuoridor(game) => game.timeout_guard(player),
-            _ => panic!("NotFound method called!"),
         }
     }
 }

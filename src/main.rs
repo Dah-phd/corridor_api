@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate rocket;
+use rocket::http::Status;
 use rocket::serde::json::Json;
 use rocket::tokio::sync::broadcast::Sender;
 use rocket::State;
@@ -148,13 +149,18 @@ fn make_move(
 }
 
 #[get("/game_state/<owner>")]
-fn get_game_state_by_owner(owner: String, token: auth::Token, active_sessions: &State<ActiveGames>) -> Json<GenericGame> {
+fn get_game_state_by_owner(
+    owner: String,
+    token: auth::Token,
+    active_sessions: &State<ActiveGames>,
+) -> Result<Json<GenericGame>, Status> {
     if let Some(game) = active_sessions.get_match_by_player(&owner) {
         if game.contains_player(&token.user) {
-            return Json(game);
+            return Ok(Json(game));
         }
+        return Err(Status::Forbidden);
     }
-    Json(GenericGame::NotFound)
+    Err(Status::NotFound)
 }
 
 #[get("/game_events/<owner>")]
@@ -201,7 +207,6 @@ fn rocket() -> _ {
             ],
         )
         .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static/build")))
-        .register("/", catchers![auth::forbidden])
         .manage(rocket::tokio::sync::broadcast::channel::<Message>(1024).0)
         .manage(rocket::tokio::sync::broadcast::channel::<GenericGame>(1024).0)
         .manage(ActiveGames::new())
