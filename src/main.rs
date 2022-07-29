@@ -49,7 +49,6 @@ async fn session_chat(
                 },
                 _ = &mut end => break,
             };
-
             yield rocket::response::stream::Event::json(&msg);
         }
     }

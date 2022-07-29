@@ -74,21 +74,17 @@ impl<'r> FromRequest<'r> for Token {
     type Error = ();
 
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, ()> {
-        let cookies: Vec<_> = request.headers().get("cookie").collect();
-        if cookies.len() > 0 {
-            if let Some(maybe_gamertag) = cookies.iter().find(|data| data.starts_with(TOKEN_ID)) {
-                if let Some(gamertag) = maybe_gamertag.split("=").last() {
-                    use super::models::DBLink;
-                    let token_services = request.rocket().state::<AuthTokenServices>();
-                    let conn = request.rocket().state::<DBLink>();
-                    if token_services.is_none() || conn.is_none() {
-                        return Outcome::Failure((Status::ServiceUnavailable, ()));
-                    }
-                    if let Some(token) = Self::decode(gamertag.to_owned(), &token_services.unwrap().validator) {
-                        if token.is_active_guest() || UserModel::is_active(conn.unwrap(), &token.user) {
-                            return Outcome::Success(token);
-                        }
-                    }
+        if let Some(maybe_gamertag) = request.cookies().get(TOKEN_ID) {
+            let gamertag = maybe_gamertag.value();
+            use super::models::DBLink;
+            let token_services = request.rocket().state::<AuthTokenServices>();
+            let conn = request.rocket().state::<DBLink>();
+            if token_services.is_none() || conn.is_none() {
+                return Outcome::Failure((Status::ServiceUnavailable, ()));
+            }
+            if let Some(token) = Self::decode(gamertag.to_owned(), &token_services.unwrap().validator) {
+                if token.is_active_guest() || UserModel::is_active(conn.unwrap(), &token.user) {
+                    return Outcome::Success(token);
                 }
             }
         }

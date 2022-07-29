@@ -495,8 +495,6 @@ mod test {
         let cpu_move = cpu::CpuPlayer::get_cpu_move(&new_game.game, false);
         if let PlayerMove::QuoridorWallH(position, _) = cpu_move {
             assert_eq!(position, (2, 3))
-        } else {
-            assert!(false)
         }
         assert_eq!(new_game.current, "pl1".to_owned());
     }
