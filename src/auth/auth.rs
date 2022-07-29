@@ -6,7 +6,7 @@ use rocket::http::Status;
 use rocket::request::{FromRequest, Outcome, Request};
 
 const KEY: &[u8] = b"secret";
-const TOKEN_ID: &str = "gamertag";
+pub const TOKEN_ID: &str = "gamertag";
 
 #[derive(rocket::serde::Serialize, rocket::serde::Deserialize, Debug)]
 #[serde(crate = "rocket::serde")]
@@ -88,7 +88,7 @@ impl<'r> FromRequest<'r> for Token {
                 }
             }
         }
-        rocket::request::Outcome::Failure((Status::Forbidden, ()))
+        Outcome::Failure((Status::Forbidden, ()))
     }
 }
 

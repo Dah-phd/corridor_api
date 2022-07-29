@@ -192,6 +192,7 @@ fn rocket() -> _ {
             "/",
             routes![
                 auth::login,
+                auth::logout,
                 auth::register,
                 auth::get_user_name_from_token,
                 post_message,
