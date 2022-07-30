@@ -1,8 +1,7 @@
 mod auth;
 use super::models;
 pub use auth::{AuthTokenServices, Token, TOKEN_ID};
-use diesel;
-use models::UserModel;
+use models::{UserModel, UserResult};
 use rocket;
 use rocket::http::{Cookie, CookieJar};
 use rocket::serde::json::Json;
@@ -11,37 +10,12 @@ extern crate time;
 use time::{Duration, OffsetDateTime};
 
 const UNAUTHORIZED: Json<UserResult<String>> = Json(UserResult::UserNotFound);
-const UNSUPPORTED_CHARS: &str = "|*#;+/\\$%@! ~=<>";
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(crate = "rocket::serde")]
 pub enum User {
     User(String, String),
     Guest(String),
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(crate = "rocket::serde")]
-pub enum UserResult<T> {
-    Ok(T),
-    PlayerExists,
-    NameTooShort,
-    UnsupportedSymbol,
-    UserNotFound,
-}
-
-impl<T> UserResult<T> {
-    pub fn derive_naming_error(username: &str) -> Option<Self> {
-        if username.len() < 4 {
-            return Some(Self::NameTooShort);
-        }
-        for char in UNSUPPORTED_CHARS.chars() {
-            if username.contains(char) {
-                return Some(Self::UnsupportedSymbol);
-            }
-        }
-        None
-    }
 }
 
 #[get("/auth/get_username")]
@@ -71,6 +45,9 @@ pub fn login(
             }
         }
         User::Guest(username) => {
+            if let Some(err) = UserModel::is_username_free(db, &username) {
+                return Json(err);
+            }
             let mut token = Token::new(username.to_owned());
             token.set_time();
             set_token(token.encode(&token_services.header), cookie_jar);
@@ -88,20 +65,18 @@ pub fn register(
     token_services: &rocket::State<auth::AuthTokenServices>,
 ) -> Json<UserResult<String>> {
     let username = new_user.user.to_owned();
-
-    let err: Option<UserResult<String>> = UserResult::derive_naming_error(&username);
-    if err.is_some() {
-        return Json(err.unwrap());
+    if let Some(err) = UserModel::is_username_free(db, &username) {
+        return Json(err);
     }
-
-    match UserModel::new_user(db, new_user.into_inner()) {
-        diesel::QueryResult::Ok(_) => {
-            let token = Token::new(username.to_owned());
-            set_token(token.encode(&token_services.header), cookie_jar);
-            Json(UserResult::Ok(username))
-        }
-        _ => UNAUTHORIZED,
+    if let Some(err) = UserModel::is_password_effective(&new_user.password) {
+        return Json(err);
     }
+    if UserModel::new_user(db, new_user.into_inner()).is_ok() {
+        let token = Token::new(username.to_owned());
+        set_token(token.encode(&token_services.header), cookie_jar);
+        return Json(UserResult::Ok(username));
+    }
+    UNAUTHORIZED
 }
 
 #[get("/auth/logout")]
