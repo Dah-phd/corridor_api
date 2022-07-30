@@ -59,10 +59,9 @@ impl UserModel {
         result.is_ok() && result.unwrap().active
     }
 
-    pub fn is_username_free(db: &DBLink, username: &String) -> Option<UserResult<String>> {
-        let nameing_error = Self::get_nameing_errors(username);
-        if nameing_error.is_some() {
-            nameing_error
+    pub fn is_username_valid(db: &DBLink, username: &String) -> Option<UserResult<String>> {
+        if let Some(naming_err) = Self::get_nameing_errors(username) {
+            Some(naming_err)
         } else if Self::get_user_object(db, username).is_ok() {
             Some(UserResult::PlayerExists)
         } else {
@@ -70,7 +69,7 @@ impl UserModel {
         }
     }
 
-    pub fn is_password_effective(password: &String) -> Option<UserResult<String>> {
+    pub fn is_password_valid(password: &String) -> Option<UserResult<String>> {
         if password.len() < 8 {
             return Some(UserResult::PassTooShort);
         }

@@ -45,7 +45,7 @@ pub fn login(
             }
         }
         User::Guest(username) => {
-            if let Some(err) = UserModel::is_username_free(db, &username) {
+            if let Some(err) = UserModel::is_username_valid(db, &username) {
                 return Json(err);
             }
             let mut token = Token::new(username.to_owned());
@@ -65,10 +65,10 @@ pub fn register(
     token_services: &rocket::State<auth::AuthTokenServices>,
 ) -> Json<UserResult<String>> {
     let username = new_user.user.to_owned();
-    if let Some(err) = UserModel::is_username_free(db, &username) {
+    if let Some(err) = UserModel::is_username_valid(db, &username) {
         return Json(err);
     }
-    if let Some(err) = UserModel::is_password_effective(&new_user.password) {
+    if let Some(err) = UserModel::is_password_valid(&new_user.password) {
         return Json(err);
     }
     if UserModel::new_user(db, new_user.into_inner()).is_ok() {

@@ -41,7 +41,10 @@ impl Token {
 
     pub fn encode(self, header: &jsonwebtoken::Header) -> String {
         let token = jsonwebtoken::encode(header, &self, &jsonwebtoken::EncodingKey::from_secret(KEY));
-        token.unwrap()
+        match token {
+            Ok(jwt) => jwt,
+            _ => "".to_owned(),
+        }
     }
 
     pub fn decode(token: String, validator: &jsonwebtoken::Validation) -> Option<Self> {
