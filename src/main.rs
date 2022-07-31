@@ -195,6 +195,8 @@ fn rocket() -> _ {
                 auth::logout,
                 auth::register,
                 auth::get_user_name_from_token,
+                auth::update_email,
+                auth::update_password,
                 post_message,
                 make_move,
                 session_chat,

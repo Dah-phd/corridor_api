@@ -20,14 +20,18 @@ pub enum UserType {
 
 #[get("/auth/get_username")]
 pub fn get_user_name_from_token(
-    mut token: auth::Token,
+    mut token: Token,
+    db: &rocket::State<models::DBLink>,
     cookie_jar: &CookieJar<'_>,
-    token_services: &rocket::State<auth::AuthTokenServices>,
-) -> Json<String> {
+    token_services: &rocket::State<AuthTokenServices>,
+) -> Json<UserType> {
     token.refresh();
     let username = token.user.to_owned();
     set_token(token.encode(&token_services.header), cookie_jar);
-    return Json(username);
+    if let Ok(user) = User::get_user_by_username(db, &username) {
+        return Json(UserType::User(user.user, user.email));
+    }
+    return Json(UserType::Guest(username));
 }
 
 #[post("/auth/login", data = "<user>")]
@@ -35,7 +39,7 @@ pub fn login(
     user: Json<UserType>,
     db: &rocket::State<models::DBLink>,
     cookie_jar: &CookieJar<'_>,
-    token_services: &rocket::State<auth::AuthTokenServices>,
+    token_services: &rocket::State<AuthTokenServices>,
 ) -> Json<UserResult<String>> {
     match user.into_inner() {
         UserType::User(username, password) => {
@@ -45,7 +49,7 @@ pub fn login(
             }
         }
         UserType::Guest(username) => {
-            if let Some(err) = User::is_username_valid(db, &username) {
+            if let Some(err) = User::maybe_naming_err(db, &username) {
                 return Json(err);
             }
             let mut token = Token::new(username.to_owned());
@@ -59,25 +63,48 @@ pub fn login(
 
 #[post("/auth/register", data = "<new_user>")]
 pub fn register(
-    new_user: Json<models::users::User>,
+    new_user: Json<User>,
     db: &rocket::State<models::DBLink>,
     cookie_jar: &CookieJar<'_>,
-    token_services: &rocket::State<auth::AuthTokenServices>,
+    token_services: &rocket::State<AuthTokenServices>,
 ) -> Json<UserResult<String>> {
     let username = new_user.user.to_owned();
-    if let Some(err) = User::is_username_valid(db, &username) {
+    if let Some(err) = User::maybe_naming_err(db, &username) {
         return Json(err);
     }
-    if let Some(err) = User::is_password_valid(&new_user.password) {
+    if let Some(err) = User::maybe_pass_err(&new_user.password) {
         return Json(err);
     }
-    if let Some(err) = User::is_email_valid(db, &new_user.email) {
+    if let Some(err) = User::maybe_email_err(db, &new_user.email) {
         return Json(err);
     }
     if new_user.into_inner().save(db).is_ok() {
         let token = Token::new(username.to_owned());
         set_token(token.encode(&token_services.header), cookie_jar);
         return Json(UserResult::Ok(username));
+    }
+    UNAUTHORIZED
+}
+
+#[put("/auth/update_email", data = "<user>")]
+pub fn update_email(user: Json<User>, _auth: Token, db: &rocket::State<models::DBLink>) -> Json<UserResult<String>> {
+    let email = user.email.to_owned();
+    if let Some(err) = User::maybe_email_err(db, &email) {
+        return Json(err);
+    }
+    if let Ok(_) = user.into_inner().change_email(db) {
+        return Json(UserResult::Ok(email));
+    }
+    UNAUTHORIZED
+}
+
+#[put("/auth/update_pass", data = "<user>")]
+pub fn update_password(user: Json<User>, _auth: Token, db: &rocket::State<models::DBLink>) -> Json<UserResult<String>> {
+    if let Some(err) = User::maybe_pass_err(&user.password) {
+        return Json(err);
+    }
+    if let Ok(_) = user.into_inner().change_password(db) {
+        return Json(UserResult::Ok("".to_owned()));
     }
     UNAUTHORIZED
 }

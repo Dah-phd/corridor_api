@@ -6,6 +6,8 @@ use diesel::prelude::*;
 use pwhash;
 use rocket;
 use rocket::serde::{Deserialize, Serialize};
+extern crate regex;
+use regex::Regex;
 
 const UNSUPPORTED_CHARS: &str = "|*#;+/\\$%@! ~=<>";
 
@@ -20,6 +22,7 @@ pub enum UserResult<T> {
     UserNotFound,
     PassTooShort,
     EmailTaken,
+    EmailNotValid,
 }
 
 fn default_player_status() -> bool {
@@ -40,12 +43,10 @@ pub struct User {
 
 impl User {
     pub fn authenticate(db: &DBLink, username: &String, pass: &String) -> Option<Self> {
-        let db = db.mutex_db.lock().unwrap();
-        let conn = &*db;
+        let conn = &*db.mutex_db.lock().unwrap();
         use schema::users::dsl::*;
-        let user_profile: QueryResult<User> = users.filter(user.eq(username.to_owned())).get_result(conn);
-        if let Ok(user_object) = user_profile {
-            if user_object.verify(pass) {
+        if let Ok(user_object) = users.filter(user.eq(username.to_owned())).get_result::<User>(conn) {
+            if user_object.verify_pass(pass) {
                 return Some(user_object);
             }
         };
@@ -53,18 +54,33 @@ impl User {
     }
 
     pub fn save(self, db: &DBLink) -> QueryResult<usize> {
-        let db = db.mutex_db.lock().unwrap();
-        let conn = &*db;
         diesel::insert_into(schema::users::table)
-            .values(self.hash_password())
-            .execute(conn)
+            .values(self.setup_for_save())
+            .execute(&*db.mutex_db.lock().unwrap())
     }
 
-    fn verify(&self, password: &str) -> bool {
-        pwhash::bcrypt::verify(password, &self.password)
+    pub fn change_email(&self, db: &DBLink) -> QueryResult<usize> {
+        use schema::users::dsl::*;
+        let target = users.filter(user.eq(&self.user));
+        diesel::update(target)
+            .set(email.eq(&self.email))
+            .execute(&*db.mutex_db.lock().unwrap())
     }
 
-    fn hash_password(mut self) -> Self {
+    pub fn change_password(self, db: &DBLink) -> QueryResult<usize> {
+        let new_user = self.setup_for_save();
+        use schema::users::dsl::*;
+        let target = users.filter(user.eq(&new_user.user));
+        diesel::update(target)
+            .set(password.eq(&new_user.password))
+            .execute(&*db.mutex_db.lock().unwrap())
+    }
+
+    fn verify_pass(&self, pass: &str) -> bool {
+        pwhash::bcrypt::verify(pass, &self.password)
+    }
+
+    fn setup_for_save(mut self) -> Self {
         let hashed_pass = pwhash::bcrypt::hash(&self.password).unwrap();
         self.password = hashed_pass;
         self
@@ -75,8 +91,8 @@ impl User {
         result.is_ok() && result.unwrap().active
     }
 
-    pub fn is_username_valid(db: &DBLink, username: &String) -> Option<UserResult<String>> {
-        if let Some(naming_err) = Self::get_nameing_errors(username) {
+    pub fn maybe_naming_err(db: &DBLink, username: &String) -> Option<UserResult<String>> {
+        if let Some(naming_err) = Self::get_naming_errors(username) {
             Some(naming_err)
         } else if Self::get_user_by_username(db, username).is_ok() {
             Some(UserResult::PlayerExists)
@@ -85,7 +101,7 @@ impl User {
         }
     }
 
-    pub fn is_password_valid(password: &String) -> Option<UserResult<String>> {
+    pub fn maybe_pass_err(password: &String) -> Option<UserResult<String>> {
         if password.len() < 8 {
             return Some(UserResult::PassTooShort);
         }
@@ -97,14 +113,19 @@ impl User {
         None
     }
 
-    pub fn is_email_valid(db: &DBLink, email: &String) -> Option<UserResult<String>> {
+    pub fn maybe_email_err(db: &DBLink, email: &String) -> Option<UserResult<String>> {
+        if let Ok(regex) = Regex::new(r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})") {
+            if !regex.is_match(email) {
+                return Some(UserResult::EmailNotValid);
+            }
+        }
         if Self::get_user_by_email(db, email).is_ok() {
             return Some(UserResult::EmailTaken);
         }
         None
     }
 
-    fn get_user_by_username(db: &DBLink, username: &String) -> QueryResult<User> {
+    pub fn get_user_by_username(db: &DBLink, username: &String) -> QueryResult<User> {
         use schema::users::dsl::*;
         let conn = &*db.mutex_db.lock().unwrap();
         users.filter(user.eq(username.to_owned())).get_result(conn)
@@ -116,7 +137,7 @@ impl User {
         users.filter(email.eq(e_mail.to_owned())).get_result(conn)
     }
 
-    fn get_nameing_errors(username: &String) -> Option<UserResult<String>> {
+    fn get_naming_errors(username: &String) -> Option<UserResult<String>> {
         if username.len() < 4 {
             return Some(UserResult::NameTooShort);
         }
