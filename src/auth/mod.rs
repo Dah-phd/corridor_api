@@ -1,7 +1,7 @@
 mod auth;
 use super::models;
 pub use auth::{AuthTokenServices, Token, TOKEN_ID};
-use models::{UserModel, UserResult};
+use models::users::{User, UserResult};
 use rocket;
 use rocket::http::{Cookie, CookieJar};
 use rocket::serde::json::Json;
@@ -13,7 +13,7 @@ const UNAUTHORIZED: Json<UserResult<String>> = Json(UserResult::UserNotFound);
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(crate = "rocket::serde")]
-pub enum User {
+pub enum UserType {
     User(String, String),
     Guest(String),
 }
@@ -32,20 +32,20 @@ pub fn get_user_name_from_token(
 
 #[post("/auth/login", data = "<user>")]
 pub fn login(
-    user: Json<User>,
+    user: Json<UserType>,
     db: &rocket::State<models::DBLink>,
     cookie_jar: &CookieJar<'_>,
     token_services: &rocket::State<auth::AuthTokenServices>,
 ) -> Json<UserResult<String>> {
     match user.into_inner() {
-        User::User(username, password) => {
-            if UserModel::authenticate(db, &username, &password) {
-                set_token(Token::new(username.to_owned()).encode(&token_services.header), cookie_jar);
-                return Json(UserResult::Ok(username));
+        UserType::User(username, password) => {
+            if let Some(user) = User::authenticate(db, &username, &password) {
+                set_token(Token::new(user.user.to_owned()).encode(&token_services.header), cookie_jar);
+                return Json(UserResult::Ok(user.user.to_owned()));
             }
         }
-        User::Guest(username) => {
-            if let Some(err) = UserModel::is_username_valid(db, &username) {
+        UserType::Guest(username) => {
+            if let Some(err) = User::is_username_valid(db, &username) {
                 return Json(err);
             }
             let mut token = Token::new(username.to_owned());
@@ -59,19 +59,22 @@ pub fn login(
 
 #[post("/auth/register", data = "<new_user>")]
 pub fn register(
-    new_user: Json<models::users::UserEntry>,
+    new_user: Json<models::users::User>,
     db: &rocket::State<models::DBLink>,
     cookie_jar: &CookieJar<'_>,
     token_services: &rocket::State<auth::AuthTokenServices>,
 ) -> Json<UserResult<String>> {
     let username = new_user.user.to_owned();
-    if let Some(err) = UserModel::is_username_valid(db, &username) {
+    if let Some(err) = User::is_username_valid(db, &username) {
         return Json(err);
     }
-    if let Some(err) = UserModel::is_password_valid(&new_user.password) {
+    if let Some(err) = User::is_password_valid(&new_user.password) {
         return Json(err);
     }
-    if UserModel::new_user(db, new_user.into_inner()).is_ok() {
+    if let Some(err) = User::is_email_valid(db, &new_user.email) {
+        return Json(err);
+    }
+    if new_user.into_inner().save(db).is_ok() {
         let token = Token::new(username.to_owned());
         set_token(token.encode(&token_services.header), cookie_jar);
         return Json(UserResult::Ok(username));
