@@ -58,6 +58,17 @@ impl ActiveGames {
         true
     }
 
+    pub fn get_game_by_owner(&self, owner: &String) -> Option<GenericGame> {
+        let games = &mut *self.list_of_games.lock().unwrap();
+        for game in games {
+            if game.get_owner() == owner.to_owned() {
+                game.timeout_guard(owner);
+                return Some(game.clone());
+            }
+        }
+        None
+    }
+
     pub fn get_match_by_player(&self, player: &String) -> Option<GenericGame> {
         let games = &mut *self.list_of_games.lock().unwrap();
         for game in games {

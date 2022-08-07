@@ -142,7 +142,7 @@ fn make_move(
         None => return Json(PlayerMoveResult::Unknown),
     };
     if let PlayerMoveResult::Ok = move_result {
-        let _ = queue.send(sessions.get_match_by_player(&owner).unwrap());
+        let _ = queue.send(sessions.get_game_by_owner(&owner).unwrap());
     }
     Json(move_result)
 }
@@ -153,7 +153,7 @@ fn get_game_state_by_owner(
     token: auth::Token,
     active_sessions: &State<ActiveGames>,
 ) -> Result<Json<GenericGame>, Status> {
-    if let Some(game) = active_sessions.get_match_by_player(&owner) {
+    if let Some(game) = active_sessions.get_game_by_owner(&owner) {
         if game.contains_player(&token.user) {
             return Ok(Json(game));
         }
