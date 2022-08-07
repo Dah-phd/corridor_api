@@ -61,7 +61,6 @@ pub fn concede_active_games_by_player(
     game_events: &State<Sender<GenericGame>>,
 ) {
     while let Some(mut game) = active_games.get_game_by_player(&token.user) {
-        // ensure all games with the user are finished => concedes existion once
         let owner = game.get_owner();
         game.make_move(PlayerMove::Concede(token.user.to_owned()));
         let _res = game_events.send(game);
