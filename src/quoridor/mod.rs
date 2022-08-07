@@ -293,10 +293,12 @@ impl QuoridorMatch {
     }
 
     fn concede(&mut self, player: &String) -> PlayerMoveResult {
-        if player == &self.up_player {
-            self.winner = Some(self.down_player.to_owned())
-        } else {
-            self.winner = Some(self.up_player.to_owned())
+        if self.winner.is_none() {
+            if player == &self.up_player {
+                self.winner = Some(self.down_player.to_owned())
+            } else {
+                self.winner = Some(self.up_player.to_owned())
+            }
         }
         PlayerMoveResult::Ok
     }

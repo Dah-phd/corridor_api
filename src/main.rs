@@ -61,13 +61,17 @@ fn make_lobby(
     token: auth::Token,
     lobbies: &State<MatchLobbies>,
     active_games: &State<ActiveGames>,
+    queue: &State<Sender<GenericGame>>,
 ) -> Json<Option<String>> {
     let lobby = lobby_base.into_inner();
     if let GameType::Unknown = lobby.game {
         lobbies.drop(&token.user);
     } else if lobby.owner == token.user && !token.is_guest() {
         if let Some(owner) = lobbies.new_lobby(lobby) {
-            if active_games.get_match_by_player(&owner).is_some() {
+            while let Some(game) = active_games.get_match_by_player(&owner) {
+                // ensure all games with the user are finished => concedes existion once
+                active_games.make_move(&game.get_owner(), PlayerMove::Concede(owner.to_owned()));
+                let _res = queue.send(game);
                 active_games.drop_by_owner(&owner)
             }
             return Json(Some(owner));
