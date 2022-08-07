@@ -23,7 +23,7 @@ mod models;
 fn post_message(msg: Json<Message>, token: auth::Token, queue: &State<Sender<Message>>, sessions: &State<ActiveGames>) {
     match &msg.id {
         ChatID::MatchID(owner) => {
-            let lobby = sessions.get_match_by_player(&owner);
+            let lobby = sessions.get_game_by_player(&owner);
             if !lobby.is_some() || !lobby.unwrap().contains_player(&token.user) {
                 return;
             }
@@ -55,25 +55,34 @@ async fn session_chat(
 }
 
 // lobbies
+pub fn concede_active_games_by_player(
+    token: auth::Token,
+    active_games: &State<ActiveGames>,
+    game_events: &State<Sender<GenericGame>>,
+) {
+    while let Some(game) = active_games.get_game_by_player(&token.user) {
+        // ensure all games with the user are finished => concedes existion once
+        let owner = game.get_owner();
+        active_games.make_move(&owner, PlayerMove::Concede(token.user.to_owned()));
+        let _res = game_events.send(game);
+        active_games.drop_by_owner(&owner);
+    }
+}
+
 #[post("/create_lobby", data = "<lobby_base>")]
 fn make_lobby(
     lobby_base: Json<LobbyBase>,
     token: auth::Token,
     lobbies: &State<MatchLobbies>,
     active_games: &State<ActiveGames>,
-    queue: &State<Sender<GenericGame>>,
+    game_events: &State<Sender<GenericGame>>,
 ) -> Json<Option<String>> {
     let lobby = lobby_base.into_inner();
     if let GameType::Unknown = lobby.game {
         lobbies.drop(&token.user);
     } else if lobby.owner == token.user && !token.is_guest() {
         if let Some(owner) = lobbies.new_lobby(lobby) {
-            while let Some(game) = active_games.get_match_by_player(&owner) {
-                // ensure all games with the user are finished => concedes existion once
-                active_games.make_move(&game.get_owner(), PlayerMove::Concede(owner.to_owned()));
-                let _res = queue.send(game);
-                active_games.drop_by_owner(&owner)
-            }
+            concede_active_games_by_player(token, active_games, game_events);
             return Json(Some(owner));
         }
     }
@@ -85,17 +94,19 @@ fn join_lobby(
     owner: String,
     token: auth::Token,
     lobbies: &State<MatchLobbies>,
-    sessions: &State<ActiveGames>,
-    lobby_queue: &State<Sender<Lobby>>,
+    active_games: &State<ActiveGames>,
+    lobby_events: &State<Sender<Lobby>>,
+    game_events: &State<Sender<GenericGame>>,
 ) -> Json<Option<String>> {
     if owner == quoridor::cpu::CPU {
-        return Json(sessions.create_cpu_game(&token.user, GameType::Quoridor));
+        return Json(active_games.create_cpu_game(&token.user, GameType::Quoridor));
     }
     if let Some(lobby) = lobbies.add_player_to_lobby(&owner, &token.user) {
+        concede_active_games_by_player(token, active_games, game_events);
         if lobby.is_ready() {
-            sessions.append(&lobby);
+            active_games.append(&lobby);
         }
-        let _res = lobby_queue.send(lobby);
+        let _res = lobby_events.send(lobby);
         return Json(Some(owner.to_owned()));
     }
     return Json(None);

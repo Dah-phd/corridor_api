@@ -69,7 +69,7 @@ impl ActiveGames {
         None
     }
 
-    pub fn get_match_by_player(&self, player: &String) -> Option<GenericGame> {
+    pub fn get_game_by_player(&self, player: &String) -> Option<GenericGame> {
         let games = &mut *self.list_of_games.lock().unwrap();
         for game in games {
             if game.contains_player(player) {
