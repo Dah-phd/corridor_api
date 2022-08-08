@@ -1,4 +1,5 @@
 mod auth;
+mod secret_key;
 use super::models;
 pub use auth::{AuthTokenServices, Token, TOKEN_ID};
 use models::users::{User, UserResult};

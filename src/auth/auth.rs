@@ -2,10 +2,10 @@ use crate::models::users::User;
 extern crate chrono;
 extern crate jsonwebtoken;
 extern crate rocket;
+use super::secret_key::KEY;
 use rocket::http::Status;
 use rocket::request::{FromRequest, Outcome, Request};
 
-const KEY: &[u8] = b"secret";
 pub const TOKEN_ID: &str = "gamertag";
 
 #[derive(rocket::serde::Serialize, rocket::serde::Deserialize, Debug)]
