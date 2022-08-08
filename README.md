@@ -5,5 +5,9 @@
 * You can view the API in practice [here](). It might take a minute to load up due to herroku due to herroku platform.
 
 
+# HOW TO RUN:
 ==========================
-In order to run the server you need to add src/auth/secret_key.rs with pub const KEY: &[u8] = b"secret_key_here"
+* You need to create src/auth/secret_key.rs with pub const KEY: &[u8] = b"secret_key_here"
+* You need diesel cli:
+    * create db.sqlite3 <= database
+    * run "diesel migration run --database-url db.sqlite3" from corridor_api location
