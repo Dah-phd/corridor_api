@@ -1,2 +1,3 @@
 /target
 src/auth/secret_key.rs
+db.sqlite3
