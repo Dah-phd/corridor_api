@@ -1,11 +1,12 @@
 extern crate a_star_traitbased;
-extern crate rocket;
-use crate::game_interface::{GenericGameInterface, PlayerMove, PlayerMoveResult};
-use rocket::serde::Serialize;
+use crate::messages::{PlayerMove, PlayerMoveResult};
 pub mod cpu;
+use serde::Serialize;
+
+const AFK_CC_TIMER: i64 = 180;
+
 
 #[derive(Debug, Serialize, Clone)]
-#[serde(crate = "rocket::serde")]
 pub struct Quoridor {
     up_player: (usize, usize),
     down_player: (usize, usize),
@@ -16,7 +17,7 @@ pub struct Quoridor {
 }
 
 impl Quoridor {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             up_player: (0, 4),
             down_player: (8, 4),
@@ -200,7 +201,6 @@ impl a_star_traitbased::PathGenerator for Quoridor {
 }
 
 #[derive(Debug, Serialize, Clone)]
-#[serde(crate = "rocket::serde")]
 pub struct QuoridorMatch {
     #[serde(skip_serializing)]
     pub owner: String,
@@ -215,10 +215,8 @@ pub struct QuoridorMatch {
     only_player_moves_allowed: bool,
 }
 
-impl GenericGameInterface for QuoridorMatch {
-    type Position = (usize, usize);
-    type Spec = ();
-    fn new(player_list: &Vec<String>, owner: String, timestamp: i64) -> Self {
+impl QuoridorMatch {
+    pub fn new(player_list: &Vec<String>, owner: String, timestamp: i64) -> Self {
         QuoridorMatch {
             up_player: player_list[0].to_owned(),
             timestamp,
@@ -236,7 +234,21 @@ impl GenericGameInterface for QuoridorMatch {
         }
     }
 
-    fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult {
+    pub fn is_expaired(&self) -> bool {
+        self.get_timestamp() + AFK_CC_TIMER + 30 < chrono::Utc::now().timestamp()
+    }
+
+    fn refresh_timestamp(&mut self) {
+        self.set_timestamp(chrono::Utc::now().timestamp())
+    }
+
+    pub fn timeout_guard(&mut self, player: &String) {
+        if self.get_timestamp() + AFK_CC_TIMER < chrono::Utc::now().timestamp() && self.get_current_player() != player {
+            self.make_move(PlayerMove::Concede(player.to_owned()));
+        }
+    }
+
+    pub fn make_move(&mut self, player_move: PlayerMove) -> PlayerMoveResult {
         if self.winner.is_some() {
             return PlayerMoveResult::GameFinished;
         }
@@ -253,11 +265,11 @@ impl GenericGameInterface for QuoridorMatch {
         result
     }
 
-    fn get_winner(&self) -> Option<String> {
+    pub fn get_winner(&self) -> Option<String> {
         self.winner.clone()
     }
 
-    fn contains_player(&self, player: &str) -> bool {
+    pub fn contains_player(&self, player: &str) -> bool {
         self.up_player == player || self.down_player == player || self.owner == player
     }
 
@@ -283,11 +295,9 @@ impl QuoridorMatch {
                 self.check_and_set_winner(&new_position, 8);
                 return PlayerMoveResult::Ok;
             }
-        } else {
-            if self.game.try_moving_down_player(new_position) {
-                self.check_and_set_winner(&new_position, 0);
-                return PlayerMoveResult::Ok;
-            }
+        } else if self.game.try_moving_down_player(new_position) {
+            self.check_and_set_winner(&new_position, 0);
+            return PlayerMoveResult::Ok;
         };
         PlayerMoveResult::Disallowed
     }
