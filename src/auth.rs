@@ -1,7 +1,17 @@
-use bcrypt::{hash, DEFAULT_COST};
-use magic_crypt::{MagicCrypt, new_magic_crypt};
+use bcrypt::{hash, verify, DEFAULT_COST};
+use magic_crypt::{new_magic_crypt, MagicCryptTrait};
+use serde::{Deserialize, Serialize};
+use serde_json::{from_str, to_string};
 
-struct Users {
+use crate::messages::JsonMessage;
+
+#[derive(Serialize, Deserialize)]
+struct UserData {
+    username: String,
+    password_hash: String,
+}
+
+pub struct Users {
     db: sled::Db,
 }
 
@@ -11,35 +21,60 @@ impl Users {
         Ok(Self { db })
     }
 
-    pub fn get_token(&self, username: &str, password: &str) -> Option<String> {
-        if self.verify_user(username, password) {
-            Self::tokenize(username, password)
-        } else {
-            None
+    pub fn get(&self, email: &str, password: &str) -> JsonMessage {
+        if let Some(username) = self.is_authenticated(email, password) {
+            return JsonMessage::User {
+                email: email.to_owned(),
+                auth_token: Self::tokenize(&username, email),
+                username,
+            };
         }
+        JsonMessage::Unauthorized
     }
 
-    fn tokenize(username: &str, password: &str) -> Option<String> {
-        todo!()
+    fn tokenize(username: &str, email: &str) -> String {
+        let mc = new_magic_crypt!(email, 256);
+        mc.encrypt_bytes_to_base64(username)
     }
 
-    pub fn new_user(&self, username: &str, password: &str) -> Option<String> {
-        if let Ok(user_exists) = self.db.contains_key(username) {
+    pub fn new_user(&self, username: String, email: String, password: String) -> JsonMessage {
+        if let Ok(user_exists) = self.db.contains_key(&username) {
             if user_exists {
-                return None;
+                return JsonMessage::EmailAlreadyInUse;
             }
-            if let Ok(hashed) = hash(password, DEFAULT_COST) {
-                if let Ok(maybe_record) = self.db.insert(username, hashed.as_bytes()) {
-                    if maybe_record.is_some() {
-                        return Self::tokenize(username, password);
+            if let Ok(password_hash) = hash(password, DEFAULT_COST) {
+                let user_payload = UserData {
+                    username: username.to_owned(),
+                    password_hash,
+                };
+                if let Ok(value) = to_string(&user_payload) {
+                    if let Ok(maybe_record) = self.db.insert(&email, value.as_bytes()) {
+                        if maybe_record.is_some() {
+                            return JsonMessage::User {
+                                auth_token: Self::tokenize(&username, &email),
+                                email,
+                                username,
+                            };
+                        }
+                    }
+                }
+            }
+        }
+        JsonMessage::ServerErrror
+    }
+
+    pub fn is_authenticated(&self, email: &str, password: &str) -> Option<String> {
+        if let Ok(Some(record)) = self.db.get(email) {
+            if let Ok(user_payload) = std::str::from_utf8(&record) {
+                if let Ok(user) = from_str::<UserData>(user_payload) {
+                    if let Ok(is_auth) = verify(password, &user.password_hash) {
+                        if is_auth {
+                            return Some(user.username);
+                        }
                     }
                 }
             }
         }
         None
-    }
-
-    pub fn verify_user(&self, username: &str, password: &str) -> bool {
-        todo!()
     }
 }

@@ -11,13 +11,18 @@ impl CpuPlayer {
     pub fn get_cpu_move(game: &Quoridor, only_palyer_moves_allowed: bool) -> PlayerMove {
         let mut instance = Self::new(game.clone());
         let new_position = instance.cpu_path[instance.cpu_path.len() - 2];
-        if !only_palyer_moves_allowed && !instance.is_cpu_closer(new_position) && instance.game.down_player_free_walls != 0 {
-            let maybe_wall = instance.get_best_wall();
-            if maybe_wall.is_some() {
-                return maybe_wall.unwrap();
+        if !only_palyer_moves_allowed
+            && !instance.is_cpu_closer(new_position)
+            && instance.game.down_player_free_walls != 0
+        {
+            if let Some(wall) = instance.get_best_wall() {
+                return wall;
             }
         }
-        return PlayerMove::QuoridorMove(new_position, CPU.to_owned());
+        PlayerMove::QuoridorMove {
+            row: new_position.0,
+            col: new_position.1,
+        }
     }
 
     fn is_cpu_closer(&self, position: (usize, usize)) -> bool {
@@ -34,8 +39,11 @@ impl CpuPlayer {
         }
     }
 
-    fn get_max_from_vec_len_to_wall(&self, len_to_positions: Vec<(usize, (usize, usize))>) -> Option<(usize, (usize, usize))> {
-        if len_to_positions.len() == 0 {
+    fn get_max_from_vec_len_to_wall(
+        &self,
+        len_to_positions: Vec<(usize, (usize, usize))>,
+    ) -> Option<(usize, (usize, usize))> {
+        if len_to_positions.is_empty() {
             return None;
         }
         let mut maxed_out = len_to_positions[0];
@@ -65,7 +73,11 @@ impl CpuPlayer {
         self.player_path.len() == 2
     }
 
-    fn get_difference_between_total_positions(&self, position_x: (usize, usize), position_y: (usize, usize)) -> usize {
+    fn get_difference_between_total_positions(
+        &self,
+        position_x: (usize, usize),
+        position_y: (usize, usize),
+    ) -> usize {
         let x = position_x.0 + position_x.1;
         let y = position_y.0 + position_y.1;
         if x > y {
@@ -94,28 +106,60 @@ impl CpuPlayer {
         if h.is_none() && v.is_none() {
             return None;
         } else if h.is_none() {
-            return Some(PlayerMove::QuoridorWallV(v.unwrap().1, CPU.to_owned()));
+            return Some(PlayerMove::QuoridorWallV {
+                row: v.unwrap().1 .0,
+                col: v.unwrap().1 .1,
+            });
         } else if v.is_none() {
-            return Some(PlayerMove::QuoridorWallH(h.unwrap().1, CPU.to_owned()));
+            return Some(PlayerMove::QuoridorWallH {
+                row: h.unwrap().1 .0,
+                col: h.unwrap().1 .1,
+            });
         }
         let v = v.unwrap();
         let h = h.unwrap();
         if v.0 > h.0 {
-            return Some(PlayerMove::QuoridorWallV(v.1, CPU.to_owned()));
+            Some(PlayerMove::QuoridorWallV {
+                row: v.1 .0,
+                col: v.1 .1,
+            })
         } else {
-            return Some(PlayerMove::QuoridorWallH(h.1, CPU.to_owned()));
+            Some(PlayerMove::QuoridorWallH {
+                row: h.1 .0,
+                col: h.1 .1,
+            })
         }
     }
 
-    fn add_new_hwall_path_result(&mut self, position: (usize, usize), storage: &mut Vec<(usize, (usize, usize))>) {
+    fn add_new_hwall_path_result(
+        &mut self,
+        position: (usize, usize),
+        storage: &mut Vec<(usize, (usize, usize))>,
+    ) {
         if self.game.new_h_wall(position) {
-            storage.push((self.game.get_shortest_path(self.game.up_player, 8).unwrap().len(), position));
+            storage.push((
+                self.game
+                    .get_shortest_path(self.game.up_player, 8)
+                    .unwrap()
+                    .len(),
+                position,
+            ));
             self.game.horizontal_walls.pop();
         }
     }
-    fn add_new_vwall_path_result(&mut self, position: (usize, usize), storage: &mut Vec<(usize, (usize, usize))>) {
+    fn add_new_vwall_path_result(
+        &mut self,
+        position: (usize, usize),
+        storage: &mut Vec<(usize, (usize, usize))>,
+    ) {
         if self.game.new_v_wall(position) {
-            storage.push((self.game.get_shortest_path(self.game.up_player, 8).unwrap().len(), position));
+            storage.push((
+                self.game
+                    .get_shortest_path(self.game.up_player, 8)
+                    .unwrap()
+                    .len(),
+                position,
+            ));
             self.game.vertical_walls.pop();
         }
     }

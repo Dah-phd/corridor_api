@@ -1,5 +1,18 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Deserialize)]
+pub struct UserLogin {
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(Deserialize)]
+pub struct UserCreate {
+    pub username: String,
+    pub email: String,
+    pub password: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum ChatID {
     MatchID(String),
@@ -14,21 +27,10 @@ pub struct Message {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum PlayerMove {
-    Concede(String),
-    QuoridorWallV((usize, usize), String),
-    QuoridorWallH((usize, usize), String),
-    QuoridorMove((usize, usize), String),
-}
-
-impl PlayerMove {
-    pub fn confirm_player(&self, player: &String) -> bool {
-        match self {
-            Self::QuoridorWallH(_, move_player) => player == move_player,
-            Self::QuoridorWallV(_, move_player) => player == move_player,
-            Self::QuoridorMove(_, move_player) => player == move_player,
-            Self::Concede(move_player) => player == move_player,
-        }
-    }
+    Concede,
+    QuoridorWallV { row: usize, col: usize },
+    QuoridorWallH { row: usize, col: usize },
+    QuoridorMove { row: usize, col: usize },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -36,15 +38,25 @@ pub enum PlayerMoveResult {
     Ok,
     WrongPlayerTurn,
     Disallowed,
-    Unauthorized,
     Unknown,
     GameFinished,
 }
 impl PlayerMoveResult {
     pub fn is_ok(&self) -> bool {
-        if let Self::Ok = self {
-            return true;
-        }
-        false
+        matches!(self, Self::Ok)
     }
+}
+
+#[derive(Serialize, Clone)]
+pub enum JsonMessage {
+    User {
+        email: String,
+        username: String,
+        auth_token: String,
+    },
+    LobbyID(String),
+    QuoridorID(String),
+    Unauthorized,
+    EmailAlreadyInUse,
+    ServerErrror,
 }

@@ -1,21 +1,75 @@
 mod game_lobbies;
-use game_lobbies::{Lobby, LobbyBase};
+use std::sync::Arc;
 mod messages;
-use messages::{ChatID, Message, PlayerMove, PlayerMoveResult};
-mod quoridor;
+use messages::{ChatID, JsonMessage, Message, PlayerMove, PlayerMoveResult, UserCreate, UserLogin};
 mod auth;
+mod quoridor;
 mod state;
-use state::AppState;
-use axum::routing::{get, post};
-use axum::{Router, Json};
-use axum::extract::{Query, State};
 use axum::extract::ws::WebSocket;
-use tower_cookies::{Cookie, Cookies, CookieManagerLayer};
+use axum::extract::{Query, State};
+use axum::routing::{get, post};
+use axum::{Json, Router};
+use state::AppState;
+use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
+const TOKEN: &str = "auth_token";
 
-const TOKEN: &str = "qr-token";
+async fn login(
+    State(app_state): State<Arc<AppState>>,
+    cookies: Cookies,
+    Json(payload): Json<UserLogin>,
+) -> Json<JsonMessage> {
+    let users = app_state.users();
+    let maybe_user = users.get(&payload.email, &payload.password);
+    if let JsonMessage::User {
+        email: _,
+        username: _,
+        auth_token,
+    } = &maybe_user
+    {
+        app_state
+            .sessions
+            .lock()
+            .expect("DEADLOCK on sessions!")
+            .insert(auth_token.clone(), maybe_user.clone());
+        cookies.add(Cookie::new(TOKEN.to_owned(), auth_token.to_owned()));
+    }
+    maybe_user.into()
+}
 
-// //chat
-// // #[post("/chat/sender", data = "<msg>")]
+async fn create_user(
+    State(app_state): State<Arc<AppState>>,
+    Json(payload): Json<UserCreate>,
+) -> Json<JsonMessage> {
+    let users = app_state.users();
+    users
+        .new_user(payload.username, payload.email, payload.password)
+        .into()
+}
+
+async fn create_lobby(
+    State(app_state): State<Arc<AppState>>,
+    cookies: Cookies,
+) -> Json<JsonMessage> {
+    if let Some(bearer) = cookies.get(TOKEN) {
+        if let Some(JsonMessage::User {
+            email,
+            username: _,
+            auth_token: _,
+        }) = app_state
+            .sessions
+            .lock()
+            .expect("DEADLOCK on sessions!")
+            .get(bearer.value())
+        {
+            return app_state.new_lobby(email.to_owned()).into();
+        }
+    }
+    JsonMessage::Unauthorized.into()
+}
+
+//chat
+
+// #[post("/chat/sender", data = "<msg>")]
 // async fn post_message(
 //     msg: Json<Message>,
 //     cookies: Cookies,
@@ -30,10 +84,10 @@ const TOKEN: &str = "qr-token";
 //             }
 //         }
 //     }
-//     // let _res = queue.send(msg.into_inner());
+// let _res = queue.send(msg.into_inner());
 // }
 
-// // #[get("/game_chat/<owner>")]
+// #[get("/game_chat/<owner>")]
 // async fn session_chat(
 //     owner: String,
 //     queue: &State<Sender<Message>>,
@@ -55,7 +109,8 @@ const TOKEN: &str = "qr-token";
 //     }
 // }
 
-// // lobbies
+// lobbies
+
 // pub fn concede_active_games_by_player(
 //     token: auth::Token,
 //     active_games: &State<ActiveGames>,
@@ -69,7 +124,7 @@ const TOKEN: &str = "qr-token";
 //     }
 // }
 
-// // #[post("/create_lobby", data = "<lobby_base>")]
+// #[post("/create_lobby", data = "<lobby_base>")]
 // async fn make_lobby(
 //     lobby_base: Json<LobbyBase>,
 //     token: auth::Token,
@@ -89,7 +144,7 @@ const TOKEN: &str = "qr-token";
 //     return Json(None);
 // }
 
-// // #[get("/join/<owner>")]
+// #[get("/join/<owner>")]
 // async fn join_lobby(
 //     owner: String,
 //     token: auth::Token,
@@ -112,12 +167,12 @@ const TOKEN: &str = "qr-token";
 //     return Json(None);
 // }
 
-// // #[get("/active_lobbies")]
+// #[get("/active_lobbies")]
 // async fn get_all_lobbies(lobbies: &State<MatchLobbies>, _auth: auth::Token) -> Json<Vec<Lobby>> {
 //     Json(lobbies.get_all())
 // }
 
-// // #[get("/lobby_events/<owner>")]
+// #[get("/lobby_events/<owner>")]
 // async fn lobby_events(
 //     _token: auth::Token,
 //     owner: String,
@@ -140,8 +195,9 @@ const TOKEN: &str = "qr-token";
 //     }
 // }
 
-// // sessions
-// // #[post("/move/<owner>", data = "<player_move>")]
+// sessions
+
+// #[post("/move/<owner>", data = "<player_move>")]
 // async fn make_move(
 //     owner: String,
 //     player_move: Json<PlayerMove>,
@@ -162,7 +218,7 @@ const TOKEN: &str = "qr-token";
 //     Json(move_result)
 // }
 
-// // #[get("/game_state/<owner>")]
+// #[get("/game_state/<owner>")]
 // async fn get_game_state_by_owner(
 //     owner: String,
 //     token: auth::Token,
@@ -177,7 +233,7 @@ const TOKEN: &str = "qr-token";
 //     Err(Status::NotFound)
 // }
 
-// // #[get("/game_events/<owner>")]
+// #[get("/game_events/<owner>")]
 // async fn match_events(
 //     owner: String,
 //     queue: &State<Sender<GenericGame>>,
@@ -202,10 +258,22 @@ const TOKEN: &str = "qr-token";
 
 #[tokio::main]
 async fn main() {
-    let app = Router::new()
-        .with_state(AppState::new_as_arc())
-        .layer(CookieManagerLayer::new());
+    let state = AppState::new_as_arc();
+    let state_for_thread = state.clone();
 
+    tokio::task::spawn(async move {
+        loop {
+            state_for_thread.recurent_clean_up();
+            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+        }
+    });
+
+    let app = Router::new()
+        .route("/auth/login", post(login))
+        .route("/auth/register", post(create_user))
+        .route("/create_lobby", get(create_lobby))
+        .with_state(state)
+        .layer(CookieManagerLayer::new());
 
     axum::Server::bind(&"0.0.0.0:8000".parse().unwrap())
         .serve(app.into_make_service())

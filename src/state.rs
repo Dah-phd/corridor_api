@@ -1,92 +1,100 @@
-use std::sync::{Mutex, Arc};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, MutexGuard};
 extern crate rand;
-use crate::messages::{PlayerMove, PlayerMoveResult};
+use crate::auth::Users;
 use crate::game_lobbies::Lobby;
+use crate::messages::{PlayerMove, PlayerMoveResult, JsonMessage};
 use crate::quoridor::QuoridorMatch;
 use rand::{distributions::Alphanumeric, Rng};
 
+const ID_LEN: usize = 8;
+
 pub struct AppState {
-    games: Arc<Mutex<Vec<QuoridorMatch>>>,
-    lobbies: Arc<Mutex<Vec<Lobby>>>,
+    quoridor_games: Arc<Mutex<HashMap<String, QuoridorMatch>>>,
+    lobbies: Arc<Mutex<HashMap<String, Lobby>>>,
+    pub users: Arc<Mutex<Users>>,
+    pub sessions: Arc<Mutex<HashMap<String, JsonMessage>>>,
 }
 
 impl AppState {
     pub fn new() -> Self {
         Self {
-            games: Arc::new(Mutex::new(vec![])),
-            lobbies: Arc::new(Mutex::new(vec![]))
+            users: Arc::new(Mutex::new(Users::init().expect("Unable to start DB!"))),
+            quoridor_games: Arc::new(Mutex::new(HashMap::new())),
+            lobbies: Arc::new(Mutex::new(HashMap::new())),
+            sessions: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
     pub fn new_as_arc() -> Arc<Self> {
-        return Arc::new(Self::new())
+        Arc::new(Self::new())
     }
 
-    pub fn create_cpu_game(&self, player: &str) -> Option<String> {
-        let id_len = 8;
-        let mut id = generate_rand_string(id_len);
-        let mut games = self.games.lock().unwrap();
-        while games.iter().any(|x| x.owner == id) {
-            id = generate_rand_string(id_len)
+    pub fn new_lobby(&self, email: String) -> JsonMessage {
+        let mut id = generate_id(ID_LEN);
+        let mut lobbies = self.lobbies.lock().expect("DEADLOCK on lobbies!");
+        while lobbies.contains_key(&id) {
+            id = generate_id(ID_LEN)
         }
-        let new_game = QuoridorMatch::new(&vec![player.to_owned()], id.to_owned(), chrono::Utc::now().timestamp());
-        games.push(new_game);
-        Some(id)
+        lobbies.insert(id.to_owned(), Lobby::new(email));
+        JsonMessage::LobbyID(id)
     }
 
-    pub fn append(&self, lobby: &Lobby) -> bool {
-        self.drop_finished();
-        let mut games = self.games.lock().unwrap();
-        let new_game = QuoridorMatch::new(&lobby.player_list, lobby.player_list[0].to_owned(), chrono::Utc::now().timestamp());
-        games.push(new_game);
-        true
-    }
-
-    pub fn get_game_by_owner(&self, owner: &String) -> Option<QuoridorMatch> {
-        let mut games = self.games.lock().unwrap();
-        for game in games.iter_mut() {
-            if game.owner == owner.to_owned() {
-                game.timeout_guard(owner);
-                return Some(game.clone());
-            }
+    pub fn new_quoridor_game(&self, lobby: &mut Lobby) -> Option<String> {
+        if lobby.player_list.is_empty() {
+            return None;
         }
-        None
-    }
-
-    pub fn get_game_by_player(&self, player: &String) -> Option<QuoridorMatch> {
-        let mut games = self.games.lock().unwrap();
-        for game in games.iter_mut() {
-            if game.contains_player(player) {
-                game.timeout_guard(player);
-                return Some(game.clone());
-            }
+        let mut id = generate_id(ID_LEN);
+        let new_game = QuoridorMatch::new(&lobby.player_list, chrono::Utc::now().timestamp());
+        let mut games = self.quoridor_games.lock().expect("DEADLOCK on games!");
+        while games.contains_key(&id) {
+            id = generate_id(ID_LEN)
         }
-        None
+        lobby.game_started = Some(id.to_owned());
+        games.insert(id.to_owned(), new_game).map(|_| id.to_owned())
     }
 
-    pub fn make_move(&self, owner: &String, player_move: PlayerMove) -> Option<PlayerMoveResult> {
-        let mut games = self.games.lock().unwrap();
-        for game in games.iter_mut() {
-            if game.owner == *owner {
-                return Some(game.make_move(player_move));
-            };
-        }
-        None
+    pub fn users(&self) -> MutexGuard<Users> {
+        self.users.lock().expect("DEADLOCK on users!")
     }
 
-    pub fn drop_by_owner(&self, owner: &String) {
-        self.drop_finished();
-        let mut games = self.games.lock().unwrap();
-        games.retain(|x| &x.owner != owner)
+    pub fn get_game_by_id(&self, id: &str) -> Option<QuoridorMatch> {
+        let games = self.quoridor_games.lock().expect("DEADLOCK on games!");
+        games.get(id).cloned()
     }
 
-    fn drop_finished(&self) {
-        let mut games = self.games.lock().unwrap();
-        games.retain(|game| game.get_winner().is_none() || !game.is_expaired())
+    pub fn get_game_by_player(&self, player: &str) -> Option<QuoridorMatch> {
+        let games = self.quoridor_games.lock().expect("DEADLOCK on games!");
+        games
+            .iter()
+            .find(|(_, game)| game.contains_player(player))
+            .map(|(_, game)| game.clone())
+    }
+
+    pub fn make_quoridor_move(
+        &self,
+        id: &str,
+        player_move: PlayerMove,
+        player: &str,
+    ) -> Option<PlayerMoveResult> {
+        let mut games = self.quoridor_games.lock().expect("DEADLOCK on games!");
+        games
+            .get_mut(id)
+            .map(|game| game.make_move(player_move, player))
+    }
+
+    pub fn drop_by_id(&self, id: &str) {
+        let mut games = self.quoridor_games.lock().expect("DEADLOCK on games!");
+        games.remove(id);
+    }
+
+    pub fn recurent_clean_up(&self) {
+        let mut games = self.quoridor_games.lock().expect("DEADLOCK on games!");
+        games.retain(|_key, game| game.get_winner().is_none() || !game.is_expaired())
     }
 }
 
-pub fn generate_rand_string(len: usize) -> String {
+pub fn generate_id(len: usize) -> String {
     let s: String = rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(len)
