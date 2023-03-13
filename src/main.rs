@@ -260,11 +260,6 @@ async fn quoridor_game(
         } else {
             return;
         };
-
-        if let Some(token) = cookies.get(TOKEN) {
-        } else {
-            return;
-        }
         if let Some(game) = app_state.get_game_by_id(&id) {
             if let Ok(game_json) = to_string(&game) {
                 if socket
