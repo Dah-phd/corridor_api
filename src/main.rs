@@ -1,12 +1,14 @@
 mod game_lobbies;
+use serde_json::{from_str, to_string};
 use std::sync::Arc;
 mod messages;
+use axum::response::Response;
 use messages::{ChatID, JsonMessage, Message, PlayerMove, PlayerMoveResult, UserCreate, UserLogin};
 mod auth;
 mod quoridor;
 mod state;
-use axum::extract::ws::WebSocket;
-use axum::extract::{Query, State};
+use axum::extract::ws::{WebSocket, WebSocketUpgrade};
+use axum::extract::{Path, Query, State};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use state::AppState;
@@ -233,6 +235,77 @@ async fn create_lobby(
 //     Err(Status::NotFound)
 // }
 
+async fn quoridor_game(
+    cookies: Cookies,
+    mut ws: WebSocketUpgrade,
+    Path(id): Path<String>,
+    State(app_state): State<Arc<AppState>>,
+) -> Response {
+    ws.on_upgrade(|mut socket: WebSocket| async move {
+        let player = if let Some(session) = cookies.get(TOKEN) {
+            if let Some(JsonMessage::User {
+                username: _,
+                email,
+                auth_token: _,
+            }) = app_state
+                .sessions
+                .lock()
+                .expect("DEADLOCK on sessions!")
+                .get(session.value())
+            {
+                email.to_owned()
+            } else {
+                return;
+            }
+        } else {
+            return;
+        };
+
+        if let Some(token) = cookies.get(TOKEN) {
+        } else {
+            return;
+        }
+        if let Some(game) = app_state.get_game_by_id(&id) {
+            if let Ok(game_json) = to_string(&game) {
+                if socket
+                    .send(axum::extract::ws::Message::Text(game_json))
+                    .await
+                    .is_ok()
+                {
+                    while let Some(msg) = socket.recv().await {
+                        let msg = if let Ok(msg) = msg {
+                            if let Ok(msg) = msg.into_text() {
+                                if let Ok(player_move) = from_str::<PlayerMove>(&msg) {
+                                    app_state.make_quoridor_move(&id, player_move, &player)
+                                } else {
+                                    return;
+                                }
+                            } else {
+                                return;
+                            }
+                        } else {
+                            // client disconnected
+                            return;
+                        };
+                        if let Ok(msg_to_send) = to_string(&msg) {
+                            if socket
+                                .send(axum::extract::ws::Message::Text(msg_to_send))
+                                .await
+                                .is_err()
+                            {
+                                // client disconnected
+                                return;
+                            }
+                        } else {
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    })
+}
+
 // #[get("/game_events/<owner>")]
 // async fn match_events(
 //     owner: String,
@@ -272,6 +345,7 @@ async fn main() {
         .route("/auth/login", post(login))
         .route("/auth/register", post(create_user))
         .route("/create_lobby", get(create_lobby))
+        .route("/quoridor_events/:id", get(quoridor_game))
         .with_state(state)
         .layer(CookieManagerLayer::new());
 
