@@ -1,4 +1,8 @@
-use serde::{Deserialize, Serialize};
+use crate::messages::JsonMessage;
+use crate::state::AppState;
+use serde::Serialize;
+use std::sync::Arc;
+use tower_cookies::Cookie;
 extern crate rand;
 
 #[derive(Debug, Serialize, Clone)]
@@ -20,4 +24,19 @@ impl Lobby {
     pub fn expaired(&self) -> bool {
         self.time_stamp < chrono::Utc::now().timestamp()
     }
+}
+
+pub fn verify_cookie(
+    maybe_cookie: Option<Cookie>,
+    app_state: Arc<AppState>,
+) -> Option<JsonMessage> {
+    if let Some(session) = maybe_cookie {
+        return app_state
+            .sessions
+            .lock()
+            .expect("DEADLOCK on sessions!")
+            .get(session.value())
+            .cloned();
+    };
+    None
 }

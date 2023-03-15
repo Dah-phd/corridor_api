@@ -270,13 +270,13 @@ impl QuoridorMatch {
             return PlayerMoveResult::GameFinished;
         }
         let result = match player_move {
-            PlayerMove::QuoridorWallH{row, col} => self.new_h_wall(player, (row, col)),
-            PlayerMove::QuoridorWallV{row, col} => self.new_v_wall(player, (row, col)),
-            PlayerMove::QuoridorMove{row, col} => self.move_player(player, (row, col)),
+            PlayerMove::QuoridorWallH { row, col } => self.new_h_wall(player, (row, col)),
+            PlayerMove::QuoridorWallV { row, col } => self.new_v_wall(player, (row, col)),
+            PlayerMove::QuoridorMove { row, col } => self.move_player(player, (row, col)),
             PlayerMove::Concede => self.concede(player),
             _ => PlayerMoveResult::Unknown,
         };
-        if result.is_ok() {
+        if matches!(result, PlayerMoveResult::Ok) {
             self.end_turn();
         };
         result
@@ -338,7 +338,7 @@ impl QuoridorMatch {
 
     fn new_h_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
         let player_status = self.player_is_valid(player);
-        if !player_status.is_ok() {
+        if !matches!(player_status, PlayerMoveResult::Ok) {
             return player_status;
         }
         if self.only_player_moves_allowed || !self.game.new_h_wall(position) {
@@ -350,7 +350,7 @@ impl QuoridorMatch {
 
     fn new_v_wall(&mut self, player: &str, position: (usize, usize)) -> PlayerMoveResult {
         let player_status = self.player_is_valid(player);
-        if !player_status.is_ok() {
+        if !matches!(player_status, PlayerMoveResult::Ok) {
             return player_status;
         }
         if self.only_player_moves_allowed || !self.game.new_v_wall(position) {
@@ -441,6 +441,8 @@ pub fn print_state(game: &Quoridor) {
 
 #[cfg(test)]
 mod test {
+    use std::result;
+
     use super::*;
     #[test]
     fn create_wall() {
@@ -482,51 +484,67 @@ mod test {
     #[test]
     fn new_match_player_moves() {
         let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned(), "pl2".to_owned()], 0);
-        assert!(new_game
-            .make_move(PlayerMove::QuoridorMove{row:1, col:4}, "pl1")
-            .is_ok());
+        let result = matches!(
+            new_game.make_move(PlayerMove::QuoridorMove { row: 1, col: 4 }, "pl1"),
+            PlayerMoveResult::Ok
+        );
+        assert!(result);
         assert_eq!(new_game.current, "pl2");
-        assert!(new_game
-            .make_move(PlayerMove::QuoridorMove{row:8, col:5}, "pl2")
-            .is_ok());
+        let result = matches!(
+            new_game.make_move(PlayerMove::QuoridorMove { row: 8, col: 5 }, "pl2"),
+            PlayerMoveResult::Ok
+        );
+        assert!(result);
         assert_eq!(new_game.current, "pl1");
     }
 
     #[test]
     fn new_match_make_borders() {
         let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned(), "pl2".to_owned()], 0);
-        assert!(new_game
-            .make_move(PlayerMove::QuoridorWallH{row:1, col:0}, "pl1")
-            .is_ok());
+        let result = matches!(
+            new_game.make_move(PlayerMove::QuoridorWallH { row: 1, col: 0 }, "pl1"),
+            PlayerMoveResult::Ok
+        );
+        assert!(result);
         assert_eq!(new_game.current, "pl2");
-        assert!(new_game
-            .make_move(PlayerMove::QuoridorWallH{row:1, col:2}, "pl2")
-            .is_ok());
+        let result = matches!(
+            new_game.make_move(PlayerMove::QuoridorWallH { row: 1, col: 2 }, "pl2"),
+            PlayerMoveResult::Ok
+        );
+        assert!(result);
         assert_eq!(new_game.current, "pl1");
-        assert!(new_game
-            .make_move(PlayerMove::QuoridorWallH{row:1, col:4}, "pl1")
-            .is_ok());
+        let result = matches!(
+            new_game.make_move(PlayerMove::QuoridorWallH { row: 1, col: 4 }, "pl1"),
+            PlayerMoveResult::Ok
+        );
+        assert!(result);
         assert_eq!(new_game.current, "pl2");
-        assert!(new_game
-            .make_move(PlayerMove::QuoridorWallH{row:1, col:6}, "pl2")
-            .is_ok());
+        let result = matches!(
+            new_game.make_move(PlayerMove::QuoridorWallH { row: 1, col: 6 }, "pl2"),
+            PlayerMoveResult::Ok
+        );
+        assert!(result);
         assert_eq!(new_game.current, "pl1");
-        assert!(new_game
-            .make_move(PlayerMove::QuoridorWallV{row:2, col:6}, "pl1")
-            .is_ok());
+        let result = matches!(
+            new_game.make_move(PlayerMove::QuoridorWallV { row: 2, col: 6 }, "pl1"),
+            PlayerMoveResult::Ok
+        );
+        assert!(result);
         assert_eq!(new_game.current, "pl2");
-        assert!(!new_game
-            .make_move(PlayerMove::QuoridorWallH{row:3, col:7}, "pl2")
-            .is_ok());
+        let result = matches!(
+            new_game.make_move(PlayerMove::QuoridorWallH { row: 3, col: 7 }, "pl2"),
+            PlayerMoveResult::Ok
+        );
+        assert!(!result);
         assert_eq!(new_game.current, "pl2");
     }
 
     #[test]
     fn test_cpu() {
         let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned()], 0);
-        new_game.make_move(PlayerMove::QuoridorMove{row:1, col:4}, "pl1");
+        new_game.make_move(PlayerMove::QuoridorMove { row: 1, col: 4 }, "pl1");
         let cpu_move = cpu::CpuPlayer::get_cpu_move(&new_game.game, false);
-        if let PlayerMove::QuoridorWallH{row, col} = cpu_move {
+        if let PlayerMove::QuoridorWallH { row, col } = cpu_move {
             assert_eq!((row, col), (2, 3))
         }
         assert_eq!(new_game.current, "pl1".to_owned());

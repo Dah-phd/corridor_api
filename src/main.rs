@@ -3,17 +3,39 @@ use serde_json::{from_str, to_string};
 use std::sync::Arc;
 mod messages;
 use axum::response::Response;
-use messages::{ChatID, JsonMessage, Message, PlayerMove, PlayerMoveResult, UserCreate, UserLogin};
+use messages::{
+    ChatID, ChatMessage, JsonMessage, PlayerMove, PlayerMoveResult, UserCreate, UserLogin,
+};
 mod auth;
 mod quoridor;
 mod state;
-use axum::extract::ws::{WebSocket, WebSocketUpgrade};
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, Query, State};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use state::AppState;
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
+use tokio::sync::broadcast;
+use futures::{sink::SinkExt, stream::StreamExt};
+
+use crate::quoridor::QuoridorMatch;
 const TOKEN: &str = "auth_token";
+
+//support
+pub fn verify_cookie(
+    maybe_cookie: Option<Cookie>,
+    app_state: Arc<AppState>,
+) -> Option<JsonMessage> {
+    if let Some(session) = maybe_cookie {
+        return app_state
+            .sessions
+            .lock()
+            .expect("DEADLOCK on sessions!")
+            .get(session.value())
+            .cloned();
+    };
+    None
+}
 
 async fn login(
     State(app_state): State<Arc<AppState>>,
@@ -52,19 +74,13 @@ async fn create_lobby(
     State(app_state): State<Arc<AppState>>,
     cookies: Cookies,
 ) -> Json<JsonMessage> {
-    if let Some(bearer) = cookies.get(TOKEN) {
-        if let Some(JsonMessage::User {
-            email,
-            username: _,
-            auth_token: _,
-        }) = app_state
-            .sessions
-            .lock()
-            .expect("DEADLOCK on sessions!")
-            .get(bearer.value())
-        {
-            return app_state.new_lobby(email.to_owned()).into();
-        }
+    if let Some(JsonMessage::User {
+        email,
+        username: _,
+        auth_token: _,
+    }) = verify_cookie(cookies.get(TOKEN), app_state.clone())
+    {
+        return app_state.new_lobby(email).into();
     }
     JsonMessage::Unauthorized.into()
 }
@@ -112,19 +128,6 @@ async fn create_lobby(
 // }
 
 // lobbies
-
-// pub fn concede_active_games_by_player(
-//     token: auth::Token,
-//     active_games: &State<ActiveGames>,
-//     game_events: &State<Sender<GenericGame>>,
-// ) {
-//     while let Some(mut game) = active_games.get_game_by_player(&token.user) {
-//         let owner = game.owner;
-//         game.make_move(PlayerMove::Concede(token.user.to_owned()));
-//         let _res = game_events.send(game);
-//         active_games.drop_by_owner(&owner);
-//     }
-// }
 
 // #[post("/create_lobby", data = "<lobby_base>")]
 // async fn make_lobby(
@@ -199,130 +202,63 @@ async fn create_lobby(
 
 // sessions
 
-// #[post("/move/<owner>", data = "<player_move>")]
-// async fn make_move(
-//     owner: String,
-//     player_move: Json<PlayerMove>,
-//     sessions: &State<ActiveGames>,
-//     token: auth::Token,
-//     queue: &State<Sender<GenericGame>>,
-// ) -> Json<PlayerMoveResult> {
-//     if !player_move.confirm_player(&token.user) {
-//         return Json(PlayerMoveResult::Unauthorized);
-//     }
-//     let move_result: PlayerMoveResult = match sessions.make_move(&owner, player_move.into_inner()) {
-//         Some(v) => v,
-//         None => return Json(PlayerMoveResult::Unknown),
-//     };
-//     if let PlayerMoveResult::Ok = move_result {
-//         let _ = queue.send(sessions.get_game_by_owner(&owner).unwrap());
-//     }
-//     Json(move_result)
-// }
-
-// #[get("/game_state/<owner>")]
-// async fn get_game_state_by_owner(
-//     owner: String,
-//     token: auth::Token,
-//     active_sessions: &State<ActiveGames>,
-// ) -> Result<Json<GenericGame>, Status> {
-//     if let Some(game) = active_sessions.get_game_by_owner(&owner) {
-//         if game.contains_player(&token.user) {
-//             return Ok(Json(game));
-//         }
-//         return Err(Status::Forbidden);
-//     }
-//     Err(Status::NotFound)
-// }
-
 async fn quoridor_game(
     cookies: Cookies,
-    mut ws: WebSocketUpgrade,
+    ws: WebSocketUpgrade,
     Path(id): Path<String>,
     State(app_state): State<Arc<AppState>>,
 ) -> Response {
     ws.on_upgrade(|mut socket: WebSocket| async move {
-        let player = if let Some(session) = cookies.get(TOKEN) {
-            if let Some(JsonMessage::User {
-                username: _,
-                email,
-                auth_token: _,
-            }) = app_state
-                .sessions
-                .lock()
-                .expect("DEADLOCK on sessions!")
-                .get(session.value())
-            {
-                email.to_owned()
-            } else {
-                return;
-            }
+        //todo: create broadcast channel to send all over the message when there is success on playermove
+        let player = if let Some(JsonMessage::User {
+            username: _,
+            email,
+            auth_token: _,
+        }) = verify_cookie(cookies.get(TOKEN), app_state.clone())
+        {
+            email.to_owned()
         } else {
             return;
         };
-        if let Some(game) = app_state.get_game_by_id(&id) {
-            if let Ok(game_json) = to_string(&game) {
-                if socket
-                    .send(axum::extract::ws::Message::Text(game_json))
-                    .await
-                    .is_ok()
-                {
-                    while let Some(msg) = socket.recv().await {
-                        let msg = if let Ok(msg) = msg {
-                            if let Ok(msg) = msg.into_text() {
-                                if let Ok(player_move) = from_str::<PlayerMove>(&msg) {
-                                    app_state.make_quoridor_move(&id, player_move, &player)
-                                } else {
-                                    return;
+        
+        let (mut channel_send, mut channel_recv) = broadcast::channel::<QuoridorMatch>(1);
+
+        let (mut sender, mut reciever) = socket.split();
+        
+        let mut sender_task = tokio::spawn(async move {
+            while let Ok(msg)= channel_recv.recv().await {
+                if let Ok(msg_to_send) = to_string(&msg) {
+                    sender.send(Message::Text(msg_to_send)).await.unwrap();
+                }
+            }
+        });
+
+        let mut recv_task = tokio::spawn(async move {
+            while let Some(Ok(msg)) = reciever.next().await {
+                if let Ok(msg) = msg.into_text() {
+                    if let Ok(player_move) = from_str::<PlayerMove>(&msg) {
+                        if let Some(result) = app_state.make_quoridor_move(&id, player_move, &player) {
+                            if matches!(result, PlayerMoveResult::Ok) {
+                                if let Some(game) = app_state.get_game_by_id(&id) {
+                                    channel_send.send(game).expect("failed to send msg");
                                 }
-                            } else {
-                                return;
                             }
-                        } else {
-                            // client disconnected
-                            return;
                         };
-                        if let Ok(msg_to_send) = to_string(&msg) {
-                            if socket
-                                .send(axum::extract::ws::Message::Text(msg_to_send))
-                                .await
-                                .is_err()
-                            {
-                                // client disconnected
-                                return;
-                            }
-                        } else {
-                            return;
-                        }
                     }
                 }
+            }
+        });
+
+        tokio::select! {
+            rv_a = (&mut sender_task) => {
+                recv_task.abort();
+            },
+            rv_b = (&mut recv_task) => {
+                sender_task.abort();
             }
         }
     })
 }
-
-// #[get("/game_events/<owner>")]
-// async fn match_events(
-//     owner: String,
-//     queue: &State<Sender<GenericGame>>,
-//     _auth: auth::Token,
-//     mut end: rocket::Shutdown,
-// ) -> rocket::response::stream::EventStream![] {
-//     let mut rx = queue.subscribe();
-//     rocket::response::stream::EventStream! {
-//         loop {
-//             let msg = rocket::tokio::select! {
-//                 msg = rx.recv() => match msg {
-//                     Ok(msg) => if msg.get_owner() == owner {msg} else {continue},
-//                     Err(rocket::tokio::sync::broadcast::error::RecvError::Closed) => break,
-//                     Err(rocket::tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-//                 },
-//                 _ = &mut end => break,
-//             };
-//             yield rocket::response::stream::Event::json(&msg);
-//         };
-//     }
-// }
 
 #[tokio::main]
 async fn main() {

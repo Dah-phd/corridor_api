@@ -19,7 +19,7 @@ pub enum ChatID {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Message {
+pub struct ChatMessage {
     pub id: ChatID,
     pub msg: String,
     pub player: String,
@@ -40,11 +40,6 @@ pub enum PlayerMoveResult {
     Disallowed,
     Unknown,
     GameFinished,
-}
-impl PlayerMoveResult {
-    pub fn is_ok(&self) -> bool {
-        matches!(self, Self::Ok)
-    }
 }
 
 #[derive(Serialize, Clone)]
