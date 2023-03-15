@@ -208,22 +208,23 @@ async fn quoridor_game(
     Path(id): Path<String>,
     State(app_state): State<Arc<AppState>>,
 ) -> Response {
-    ws.on_upgrade(|mut socket: WebSocket| async move {
-        //todo: create broadcast channel to send all over the message when there is success on playermove
+    ws.on_upgrade(|socket: WebSocket| async move {
         let player = if let Some(JsonMessage::User {
             username: _,
             email,
             auth_token: _,
         }) = verify_cookie(cookies.get(TOKEN), app_state.clone())
         {
-            email.to_owned()
+            email
         } else {
             return;
         };
         
-        let (mut channel_send, mut channel_recv) = broadcast::channel::<QuoridorMatch>(1);
+        let (channel_send, mut channel_recv) = broadcast::channel::<QuoridorMatch>(1);
 
         let (mut sender, mut reciever) = socket.split();
+
+        // todo: add logic to send state only if move is Ok else send message only to the player that his move is forbidden;
         
         let mut sender_task = tokio::spawn(async move {
             while let Ok(msg)= channel_recv.recv().await {
@@ -250,10 +251,10 @@ async fn quoridor_game(
         });
 
         tokio::select! {
-            rv_a = (&mut sender_task) => {
+            _rv_a = (&mut sender_task) => {
                 recv_task.abort();
             },
-            rv_b = (&mut recv_task) => {
+            _rv_b = (&mut recv_task) => {
                 sender_task.abort();
             }
         }
