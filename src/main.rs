@@ -219,8 +219,14 @@ async fn quoridor_game(
         } else {
             return;
         };
-        
-        let (channel_send, mut channel_recv) = broadcast::channel::<QuoridorMatch>(1);
+
+        let channel_send = if let Some(sender) = app_state.get_quoridor_channel_by_id(&id){
+            sender
+        } else {
+            return // also checks if the game exist!
+        };
+
+        let mut channel_recv = channel_send.subscribe();
 
         let (mut sender, mut reciever) = socket.split();
 
@@ -240,7 +246,7 @@ async fn quoridor_game(
                     if let Ok(player_move) = from_str::<PlayerMove>(&msg) {
                         if let Some(result) = app_state.make_quoridor_move(&id, player_move, &player) {
                             if matches!(result, PlayerMoveResult::Ok) {
-                                if let Some(game) = app_state.get_game_by_id(&id) {
+                                if let Some(game) = app_state.get_quoridor_state_by_id(&id) {
                                     channel_send.send(game).expect("failed to send msg");
                                 }
                             }

@@ -6,11 +6,13 @@ use crate::game_lobbies::Lobby;
 use crate::messages::{PlayerMove, PlayerMoveResult, JsonMessage};
 use crate::quoridor::QuoridorMatch;
 use rand::{distributions::Alphanumeric, Rng};
+use tokio::sync::broadcast;
 
 const ID_LEN: usize = 8;
+type QuoridorPackage = (QuoridorMatch, broadcast::Sender<QuoridorMatch>);
 
 pub struct AppState {
-    quoridor_games: Arc<Mutex<HashMap<String, QuoridorMatch>>>,
+    quoridor_games: Arc<Mutex<HashMap<String, QuoridorPackage>>>,
     lobbies: Arc<Mutex<HashMap<String, Lobby>>>,
     pub users: Arc<Mutex<Users>>,
     pub sessions: Arc<Mutex<HashMap<String, JsonMessage>>>,
@@ -44,6 +46,7 @@ impl AppState {
         if lobby.player_list.is_empty() {
             return None;
         }
+        let (channel, _) = broadcast::channel::<QuoridorMatch>(1);
         let mut id = generate_id(ID_LEN);
         let new_game = QuoridorMatch::new(&lobby.player_list, chrono::Utc::now().timestamp());
         let mut games = self.quoridor_games.lock().expect("DEADLOCK on games!");
@@ -51,24 +54,29 @@ impl AppState {
             id = generate_id(ID_LEN)
         }
         lobby.game_started = Some(id.to_owned());
-        games.insert(id.to_owned(), new_game).map(|_| id.to_owned())
+        games.insert(id.to_owned(), (new_game, channel)).map(|_| id.to_owned())
     }
 
     pub fn users(&self) -> MutexGuard<Users> {
         self.users.lock().expect("DEADLOCK on users!")
     }
 
-    pub fn get_game_by_id(&self, id: &str) -> Option<QuoridorMatch> {
+    pub fn get_quoridor_state_by_id(&self, id: &str) -> Option<QuoridorMatch> {
         let games = self.quoridor_games.lock().expect("DEADLOCK on games!");
-        games.get(id).cloned()
+        games.get(id).map(|(game, _)| game.clone())
     }
 
-    pub fn get_game_by_player(&self, player: &str) -> Option<QuoridorMatch> {
+    pub fn get_quoridor_state_by_player(&self, player: &str) -> Option<QuoridorMatch> {
         let games = self.quoridor_games.lock().expect("DEADLOCK on games!");
         games
             .iter()
-            .find(|(_, game)| game.contains_player(player))
-            .map(|(_, game)| game.clone())
+            .find(|(_key, (game, _))| game.contains_player(player))
+            .map(|(_key, (game, _))| game.clone())
+    }
+
+    pub fn get_quoridor_channel_by_id(&self, id: &str) -> Option<broadcast::Sender<QuoridorMatch>> {
+        let games = self.quoridor_games.lock().expect("DEADLOCK on games!");
+        games.get(id).map(|(_, channel)|channel.clone())
     }
 
     pub fn make_quoridor_move(
@@ -80,7 +88,7 @@ impl AppState {
         let mut games = self.quoridor_games.lock().expect("DEADLOCK on games!");
         games
             .get_mut(id)
-            .map(|game| game.make_move(player_move, player))
+            .map(|(game, _)| game.make_move(player_move, player))
     }
 
     pub fn drop_by_id(&self, id: &str) {
@@ -90,7 +98,7 @@ impl AppState {
 
     pub fn recurent_clean_up(&self) {
         let mut games = self.quoridor_games.lock().expect("DEADLOCK on games!");
-        games.retain(|_key, game| game.get_winner().is_none() || !game.is_expaired())
+        games.retain(|_key, (game, _)| game.get_winner().is_none() || !game.is_expaired())
     }
 }
 
