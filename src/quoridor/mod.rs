@@ -21,10 +21,10 @@ pub struct QuoridorMatch {
 }
 
 impl QuoridorMatch {
-    pub fn new(player_list: &Vec<String>, timestamp: i64) -> Self {
+    pub fn new(player_list: &Vec<String>) -> Self {
         QuoridorMatch {
             up_player: player_list[0].to_owned(),
-            timestamp,
+            timestamp: chrono::Utc::now().timestamp(),
             down_player: if player_list.len() >= 2 {
                 player_list[1].to_owned()
             } else {
@@ -42,7 +42,7 @@ impl QuoridorMatch {
         self.get_timestamp() + AFK_CC_TIMER + 30 < chrono::Utc::now().timestamp()
     }
 
-    fn refresh_timestamp(&mut self) {
+    pub fn refresh_timestamp(&mut self) {
         self.set_timestamp(chrono::Utc::now().timestamp())
     }
 
@@ -58,12 +58,12 @@ impl QuoridorMatch {
         if self.winner.is_some() {
             return PlayerMoveResult::GameFinished;
         }
+        self.refresh_timestamp();
         let result = match player_move {
             PlayerMove::QuoridorWallH { row, col } => self.new_h_wall(player, (row, col)),
             PlayerMove::QuoridorWallV { row, col } => self.new_v_wall(player, (row, col)),
             PlayerMove::QuoridorMove { row, col } => self.move_player(player, (row, col)),
             PlayerMove::Concede => self.concede(player),
-            _ => PlayerMoveResult::Unknown,
         };
         if matches!(result, PlayerMoveResult::Ok) {
             self.end_turn();
@@ -84,10 +84,6 @@ impl QuoridorMatch {
     }
     fn set_timestamp(&mut self, timestamp: i64) {
         self.timestamp = timestamp
-    }
-
-    fn get_current_player(&self) -> &String {
-        &self.current
     }
 }
 
@@ -270,7 +266,7 @@ mod test {
 
     #[test]
     fn new_match_player_moves() {
-        let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned(), "pl2".to_owned()], 0);
+        let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned(), "pl2".to_owned()]);
         let result = matches!(
             new_game.make_move(PlayerMove::QuoridorMove { row: 1, col: 4 }, "pl1"),
             PlayerMoveResult::Ok
@@ -287,7 +283,7 @@ mod test {
 
     #[test]
     fn new_match_make_borders() {
-        let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned(), "pl2".to_owned()], 0);
+        let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned(), "pl2".to_owned()]);
         let result = matches!(
             new_game.make_move(PlayerMove::QuoridorWallH { row: 1, col: 0 }, "pl1"),
             PlayerMoveResult::Ok
@@ -328,7 +324,7 @@ mod test {
 
     #[test]
     fn test_cpu() {
-        let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned()], 0);
+        let mut new_game = QuoridorMatch::new(&vec!["pl1".to_owned()]);
         new_game.make_move(PlayerMove::QuoridorMove { row: 1, col: 4 }, "pl1");
         let cpu_move = cpu::CpuPlayer::get_cpu_move(&new_game.game, false);
         if let PlayerMove::QuoridorWallH { row, col } = cpu_move {

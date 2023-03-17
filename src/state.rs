@@ -34,26 +34,27 @@ impl AppState {
         JsonMessage::LobbyID(id)
     }
 
-    pub fn join_lobby(&self, email: String, id: &str) -> JsonMessage {
+    pub fn join_lobby(&self, email: String, id: &str) -> Option<String> {
         let mut lobbies = self.lobbies.lock().expect("DEADLOCK on lobbies!");
         if let Some(lobby) = lobbies.get_mut(id) {
             lobby.player_list.push(email);
+            self.quoridor_new_game(lobby)
+        } else {
+            None
         }
-        todo!()
     }
 
-    pub fn new_quoridor_game(&self, lobby: &mut Lobby) -> Option<String> {
+    fn quoridor_new_game(&self, lobby: &mut Lobby) -> Option<String> {
         if lobby.player_list.is_empty() {
             return None;
         }
         let (channel, _) = broadcast::channel::<QuoridorMatch>(1);
         let mut id = generate_id(ID_LEN);
-        let new_game = QuoridorMatch::new(&lobby.player_list, chrono::Utc::now().timestamp());
+        let new_game = QuoridorMatch::new(&lobby.player_list);
         let mut games = self.quoridor_games.lock().expect("DEADLOCK on games!");
         while games.contains_key(&id) {
             id = generate_id(ID_LEN)
         }
-        lobby.game_started = Some(id.to_owned());
         games
             .insert(id.to_owned(), (new_game, channel))
             .map(|_| id.to_owned())
@@ -63,12 +64,12 @@ impl AppState {
         self.users.lock().expect("DEADLOCK on users!")
     }
 
-    pub fn get_quoridor_state_by_id(&self, id: &str) -> Option<QuoridorMatch> {
+    pub fn quoridor_get_state_by_id(&self, id: &str) -> Option<QuoridorMatch> {
         let games = self.quoridor_games.lock().expect("DEADLOCK on games!");
         games.get(id).map(|(game, _)| game.clone())
     }
 
-    pub fn get_quoridor_state_by_player(&self, player: &str) -> Option<QuoridorMatch> {
+    pub fn quoridor_get_state_by_player(&self, player: &str) -> Option<QuoridorMatch> {
         let games = self.quoridor_games.lock().expect("DEADLOCK on games!");
         games
             .iter()
@@ -76,7 +77,7 @@ impl AppState {
             .map(|(_key, (game, _))| game.clone())
     }
 
-    pub fn get_quoridor_channel_by_id(&self, id: &str) -> Option<QuoridorPackage> {
+    pub fn quoridor_get_full(&self, id: &str) -> Option<QuoridorPackage> {
         self.quoridor_games
             .lock()
             .expect("DEADLOCK on games!")
@@ -103,7 +104,10 @@ impl AppState {
 
     pub fn recurent_clean_up(&self) {
         let mut games = self.quoridor_games.lock().expect("DEADLOCK on games!");
-        games.retain(|_key, (game, _)| game.get_winner().is_none() || !game.is_expaired())
+        games.retain(|_key, (game, _)| game.get_winner().is_none() || !game.is_expaired());
+        drop(games);
+        let mut lobbies = self.lobbies.lock().expect("DEADLOCK on lobbies!");
+        lobbies.retain(|_key, lobby| !lobby.is_expaired());
     }
 }
 

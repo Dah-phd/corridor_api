@@ -52,4 +52,5 @@ pub enum JsonMessage {
     Unauthorized,
     EmailAlreadyInUse,
     ServerErrror,
+    AlreadyStarted
 }

@@ -127,7 +127,7 @@ async fn create_lobby(
 
 async fn join_lobby(
     State(app_state): State<Arc<AppState>>,
-    Path(mathc_id): Path<String>,
+    Path(id): Path<String>,
     cookies: Cookies,
 ) -> Json<JsonMessage> {
     if let Some(JsonMessage::User {
@@ -136,9 +136,14 @@ async fn join_lobby(
         auth_token: _,
     }) = verify_cookie(cookies.get(TOKEN), app_state.clone())
     {
-        // app_state
+        if let Some(game_id) = app_state.join_lobby(email, &id) {
+            JsonMessage::QuoridorID(game_id).into()
+        } else {
+            JsonMessage::AlreadyStarted.into()
+        }
+    } else {
+        JsonMessage::Unauthorized.into()
     }
-    todo!()
 }
 
 // #[get("/join/<owner>")]
@@ -212,7 +217,7 @@ async fn quoridor_game(
             return;
         };
 
-        let channel_send = if let Some((game, sender)) = app_state.get_quoridor_channel_by_id(&id) {
+        let channel_send = if let Some((game, sender)) = app_state.quoridor_get_full(&id) {
             if let Ok(msg) = to_string(&game) {
                 socket.send(msg.into()).await.unwrap();
             }
@@ -243,7 +248,7 @@ async fn quoridor_game(
                             app_state.make_quoridor_move(&id, player_move, &player)
                         {
                             if matches!(result, PlayerMoveResult::Ok) {
-                                if let Some(game) = app_state.get_quoridor_state_by_id(&id) {
+                                if let Some(game) = app_state.quoridor_get_state_by_id(&id) {
                                     channel_send.send(game).expect("failed to send msg");
                                 }
                             }
@@ -280,7 +285,7 @@ async fn main() {
         .route("/auth/login", post(login))
         .route("/auth/register", post(create_user))
         .route("/create_lobby", get(create_lobby))
-        .route("/join_lobby/:match_id", get(join_lobby))
+        .route("/join_lobby/:id", get(join_lobby))
         .route("/quoridor_events/:id", get(quoridor_game))
         .with_state(state)
         .layer(CookieManagerLayer::new());
