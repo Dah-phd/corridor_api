@@ -129,26 +129,6 @@ async fn create_lobby(
 
 // lobbies
 
-// #[post("/create_lobby", data = "<lobby_base>")]
-// async fn make_lobby(
-//     lobby_base: Json<LobbyBase>,
-//     token: auth::Token,
-//     lobbies: &State<MatchLobbies>,
-//     active_games: &State<ActiveGames>,
-//     game_events: &State<Sender<GenericGame>>,
-// ) -> Json<Option<String>> {
-//     let lobby = lobby_base.into_inner();
-//     if let GameType::Unknown = lobby.game {
-//         lobbies.drop(&token.user);
-//     } else if lobby.owner == token.user && !token.is_guest() {
-//         if let Some(owner) = lobbies.new_lobby(lobby) {
-//             concede_active_games_by_player(token, active_games, game_events);
-//             return Json(Some(owner));
-//         }
-//     }
-//     return Json(None);
-// }
-
 // #[get("/join/<owner>")]
 // async fn join_lobby(
 //     owner: String,
@@ -208,7 +188,7 @@ async fn quoridor_game(
     Path(id): Path<String>,
     State(app_state): State<Arc<AppState>>,
 ) -> Response {
-    ws.on_upgrade(|socket: WebSocket| async move {
+    ws.on_upgrade(|mut socket: WebSocket| async move {
         let player = if let Some(JsonMessage::User {
             username: _,
             email,
@@ -220,7 +200,10 @@ async fn quoridor_game(
             return;
         };
 
-        let channel_send = if let Some(sender) = app_state.get_quoridor_channel_by_id(&id){
+        let channel_send = if let Some((game, sender)) = app_state.get_quoridor_channel_by_id(&id){
+            if let Ok(msg) = to_string(&game) {
+                socket.send(msg.into()).await.unwrap();
+            }
             sender
         } else {
             return // also checks if the game exist!
@@ -235,7 +218,7 @@ async fn quoridor_game(
         let mut sender_task = tokio::spawn(async move {
             while let Ok(msg)= channel_recv.recv().await {
                 if let Ok(msg_to_send) = to_string(&msg) {
-                    sender.send(Message::Text(msg_to_send)).await.unwrap();
+                    sender.send(msg_to_send.into()).await.unwrap();
                 }
             }
         });

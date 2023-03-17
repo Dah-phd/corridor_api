@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 extern crate rand;
 use crate::auth::Users;
 use crate::game_lobbies::Lobby;
-use crate::messages::{PlayerMove, PlayerMoveResult, JsonMessage};
+use crate::messages::{JsonMessage, PlayerMove, PlayerMoveResult};
 use crate::quoridor::QuoridorMatch;
 use rand::{distributions::Alphanumeric, Rng};
 use tokio::sync::broadcast;
@@ -46,7 +46,9 @@ impl AppState {
             id = generate_id(ID_LEN)
         }
         lobby.game_started = Some(id.to_owned());
-        games.insert(id.to_owned(), (new_game, channel)).map(|_| id.to_owned())
+        games
+            .insert(id.to_owned(), (new_game, channel))
+            .map(|_| id.to_owned())
     }
 
     pub fn users(&self) -> MutexGuard<Users> {
@@ -66,9 +68,12 @@ impl AppState {
             .map(|(_key, (game, _))| game.clone())
     }
 
-    pub fn get_quoridor_channel_by_id(&self, id: &str) -> Option<broadcast::Sender<QuoridorMatch>> {
-        let games = self.quoridor_games.lock().expect("DEADLOCK on games!");
-        games.get(id).map(|(_, channel)|channel.clone())
+    pub fn get_quoridor_channel_by_id(&self, id: &str) -> Option<QuoridorPackage> {
+        self.quoridor_games
+            .lock()
+            .expect("DEADLOCK on games!")
+            .get(id)
+            .cloned()
     }
 
     pub fn make_quoridor_move(
