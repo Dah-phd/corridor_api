@@ -11,22 +11,12 @@ use tokio::sync::broadcast;
 const ID_LEN: usize = 8;
 type QuoridorPackage = (QuoridorMatch, broadcast::Sender<QuoridorMatch>);
 
+#[derive(Default)]
 pub struct AppState {
     quoridor_games: Arc<Mutex<HashMap<String, QuoridorPackage>>>,
     lobbies: Arc<Mutex<HashMap<String, Lobby>>>,
     pub users: Arc<Mutex<Users>>,
     pub sessions: Arc<Mutex<HashMap<String, JsonMessage>>>,
-}
-
-impl Default for AppState {
-    fn default() -> Self {
-        Self {
-            users: Arc::new(Mutex::new(Users::init().expect("Unable to start DB!"))),
-            quoridor_games: Arc::new(Mutex::new(HashMap::new())),
-            lobbies: Arc::new(Mutex::new(HashMap::new())),
-            sessions: Arc::new(Mutex::new(HashMap::new())),
-        }
-    }
 }
 
 impl AppState {

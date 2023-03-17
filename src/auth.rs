@@ -15,6 +15,12 @@ pub struct Users {
     db: sled::Db,
 }
 
+impl Default for Users {
+    fn default() -> Self {
+        Self { db: sled::open("users").expect("Unable to start DB!") }
+    }
+}
+
 impl Users {
     pub fn init() -> Result<Users, sled::Error> {
         let db = sled::open("users")?;
