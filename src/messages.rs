@@ -18,12 +18,6 @@ pub enum ChatID {
     MatchID(String),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ChatMessage {
-    pub id: ChatID,
-    pub msg: String,
-    pub player: String,
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum PlayerMove {
@@ -48,6 +42,10 @@ pub enum JsonMessage {
         email: String,
         username: String,
         auth_token: String,
+    },
+    ChatMessage {
+        user: String,
+        msg: String,
     },
     LobbyID(String),
     QuoridorID(String),

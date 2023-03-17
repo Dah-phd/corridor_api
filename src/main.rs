@@ -3,22 +3,18 @@ use serde_json::{from_str, to_string};
 use std::sync::Arc;
 mod messages;
 use axum::response::Response;
-use messages::{
-    ChatID, ChatMessage, JsonMessage, PlayerMove, PlayerMoveResult, UserCreate, UserLogin,
-};
+use messages::{JsonMessage, PlayerMove, PlayerMoveResult, UserCreate, UserLogin};
 mod auth;
 mod quoridor;
 mod state;
-use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{Path, Query, State};
+use axum::extract::ws::{WebSocket, WebSocketUpgrade};
+use axum::extract::{Path, State};
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use futures::{sink::SinkExt, stream::StreamExt};
 use state::AppState;
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
-use tokio::sync::broadcast;
-use futures::{sink::SinkExt, stream::StreamExt};
 
-use crate::quoridor::QuoridorMatch;
 const TOKEN: &str = "auth_token";
 
 //support
@@ -129,6 +125,20 @@ async fn create_lobby(
 
 // lobbies
 
+async fn join_lobby(
+    State(app_state): State<Arc<AppState>>,
+    Path(mathc_id): Path<String>,
+    cookies: Cookies,
+) -> Json<JsonMessage> {
+    if let Some(JsonMessage::User {
+        email,
+        username: _,
+        auth_token: _,
+    }) = verify_cookie(cookies.get(TOKEN), app_state.clone())
+    {}
+    todo!()
+}
+
 // #[get("/join/<owner>")]
 // async fn join_lobby(
 //     owner: String,
@@ -200,13 +210,13 @@ async fn quoridor_game(
             return;
         };
 
-        let channel_send = if let Some((game, sender)) = app_state.get_quoridor_channel_by_id(&id){
+        let channel_send = if let Some((game, sender)) = app_state.get_quoridor_channel_by_id(&id) {
             if let Ok(msg) = to_string(&game) {
                 socket.send(msg.into()).await.unwrap();
             }
             sender
         } else {
-            return // also checks if the game exist!
+            return; // also checks if the game exist!
         };
 
         let mut channel_recv = channel_send.subscribe();
@@ -214,9 +224,9 @@ async fn quoridor_game(
         let (mut sender, mut reciever) = socket.split();
 
         // todo: add logic to send state only if move is Ok else send message only to the player that his move is forbidden;
-        
+
         let mut sender_task = tokio::spawn(async move {
-            while let Ok(msg)= channel_recv.recv().await {
+            while let Ok(msg) = channel_recv.recv().await {
                 if let Ok(msg_to_send) = to_string(&msg) {
                     sender.send(msg_to_send.into()).await.unwrap();
                 }
@@ -227,7 +237,9 @@ async fn quoridor_game(
             while let Some(Ok(msg)) = reciever.next().await {
                 if let Ok(msg) = msg.into_text() {
                     if let Ok(player_move) = from_str::<PlayerMove>(&msg) {
-                        if let Some(result) = app_state.make_quoridor_move(&id, player_move, &player) {
+                        if let Some(result) =
+                            app_state.make_quoridor_move(&id, player_move, &player)
+                        {
                             if matches!(result, PlayerMoveResult::Ok) {
                                 if let Some(game) = app_state.get_quoridor_state_by_id(&id) {
                                     channel_send.send(game).expect("failed to send msg");
@@ -266,6 +278,7 @@ async fn main() {
         .route("/auth/login", post(login))
         .route("/auth/register", post(create_user))
         .route("/create_lobby", get(create_lobby))
+        .route("/join_lobby/:match_id", get(join_lobby))
         .route("/quoridor_events/:id", get(quoridor_game))
         .with_state(state)
         .layer(CookieManagerLayer::new());
