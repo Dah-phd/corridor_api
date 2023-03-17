@@ -34,6 +34,14 @@ impl AppState {
         JsonMessage::LobbyID(id)
     }
 
+    pub fn join_lobby(&self, email: String, id: &str) -> JsonMessage {
+        let mut lobbies = self.lobbies.lock().expect("DEADLOCK on lobbies!");
+        if let Some(lobby) = lobbies.get_mut(id) {
+            lobby.player_list.push(email);
+        }
+        todo!()
+    }
+
     pub fn new_quoridor_game(&self, lobby: &mut Lobby) -> Option<String> {
         if lobby.player_list.is_empty() {
             return None;

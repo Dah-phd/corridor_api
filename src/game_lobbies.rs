@@ -1,5 +1,6 @@
 use crate::messages::JsonMessage;
 use crate::state::AppState;
+use crate::quoridor::QuoridorMatch;
 use serde::Serialize;
 use std::sync::Arc;
 use tower_cookies::Cookie;
@@ -40,3 +41,9 @@ pub fn verify_cookie(
     };
     None
 }
+
+// impl Into<QuoridorMatch> for Lobby {
+//     fn into(self) -> QuoridorMatch {
+//         QuoridorMatch::new()
+//     }
+// }

@@ -135,7 +135,9 @@ async fn join_lobby(
         username: _,
         auth_token: _,
     }) = verify_cookie(cookies.get(TOKEN), app_state.clone())
-    {}
+    {
+        // app_state
+    }
     todo!()
 }
 
