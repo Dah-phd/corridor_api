@@ -18,8 +18,8 @@ pub struct AppState {
     pub sessions: Arc<Mutex<HashMap<String, JsonMessage>>>,
 }
 
-impl AppState {
-    pub fn new() -> Self {
+impl Default for AppState {
+    fn default() -> Self {
         Self {
             users: Arc::new(Mutex::new(Users::init().expect("Unable to start DB!"))),
             quoridor_games: Arc::new(Mutex::new(HashMap::new())),
@@ -27,9 +27,11 @@ impl AppState {
             sessions: Arc::new(Mutex::new(HashMap::new())),
         }
     }
+}
 
+impl AppState {
     pub fn new_as_arc() -> Arc<Self> {
-        Arc::new(Self::new())
+        Arc::new(Self::default())
     }
 
     pub fn new_lobby(&self, email: String) -> JsonMessage {
