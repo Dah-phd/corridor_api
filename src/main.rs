@@ -21,20 +21,6 @@ use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
 const TOKEN: &str = "auth_token";
 
 //support
-pub fn verify_cookie(
-    maybe_cookie: Option<Cookie>,
-    app_state: Arc<AppState>,
-) -> Option<JsonMessage> {
-    if let Some(session) = maybe_cookie {
-        return app_state
-            .sessions
-            .lock()
-            .expect("DEADLOCK on sessions!")
-            .get(session.value())
-            .cloned();
-    };
-    None
-}
 
 async fn login(
     State(app_state): State<Arc<AppState>>,
@@ -204,16 +190,12 @@ async fn quoridor_que(
     State(app_state): State<Arc<AppState>>,
 ) -> Response {
     ws.on_upgrade(|mut socket| async move {
-        let player = if let Some(JsonMessage::User {
-            username: _,
-            email,
-            auth_token: _,
-        }) = verify_cookie(cookies.get(TOKEN), app_state.clone())
-        {
-            email
-        } else {
-            return;
-        };
+        let player =
+            if let JsonMessage::User { email, .. } = app_state.get_session(cookies.get(TOKEN)) {
+                email
+            } else {
+                return;
+            };
         let (sender, receiver) = tokio::sync::oneshot::channel::<String>();
 
         match receiver.await {
@@ -230,16 +212,12 @@ async fn quoridor_game(
     State(app_state): State<Arc<AppState>>,
 ) -> Response {
     ws.on_upgrade(|mut socket: WebSocket| async move {
-        let player = if let Some(JsonMessage::User {
-            username: _,
-            email,
-            auth_token: _,
-        }) = verify_cookie(cookies.get(TOKEN), app_state.clone())
-        {
-            email
-        } else {
-            return;
-        };
+        let player =
+            if let JsonMessage::User { email, .. } = app_state.get_session(cookies.get(TOKEN)) {
+                email
+            } else {
+                return;
+            };
 
         let channel_send = if let Some((game, sender)) = app_state.quoridor_get_full(&id) {
             if let Ok(msg) = to_string(&game) {
