@@ -7,10 +7,21 @@ pub struct UserLogin {
 }
 
 #[derive(Deserialize)]
+pub struct GuestLogin {
+    pub username: String
+}
+
+#[derive(Deserialize)]
 pub struct UserCreate {
     pub username: String,
     pub email: String,
     pub password: String,
+}
+
+#[derive(Serialize)]
+pub struct UserContext {
+    pub user: JsonMessage,
+    pub active_match: JsonMessage
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -47,12 +58,11 @@ pub enum JsonMessage {
         user: String,
         msg: String,
     },
-    LobbyID(String),
     QuoridorID(String),
     Unauthorized,
+    NotFound,
     NotAnEmail,
     ShouldNotBeEmail,
     EmailAlreadyInUse,
     ServerErrror,
-    AlreadyStarted
 }

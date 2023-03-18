@@ -38,19 +38,14 @@ impl QuoridorMatch {
         }
     }
 
-    pub fn is_expaired(&self) -> bool {
-        self.get_timestamp() + AFK_CC_TIMER + 30 < chrono::Utc::now().timestamp()
-    }
-
     pub fn refresh_timestamp(&mut self) {
         self.set_timestamp(chrono::Utc::now().timestamp())
     }
 
-    pub fn timeout_guard(&mut self, player: &String) {
+    pub fn timeout_guard(&mut self) {
         if self.get_timestamp() + AFK_CC_TIMER < chrono::Utc::now().timestamp()
-            && &self.current != player
         {
-            self.make_move(PlayerMove::Concede, player);
+            self.make_move(PlayerMove::Concede, &self.current.clone());
         }
     }
 

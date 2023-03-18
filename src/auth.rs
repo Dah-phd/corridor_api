@@ -1,5 +1,4 @@
 use bcrypt::{hash, verify, DEFAULT_COST};
-use magic_crypt::{new_magic_crypt, MagicCryptTrait};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
@@ -28,23 +27,18 @@ impl Default for Users {
 }
 
 impl Users {
-    pub fn get(&self, email: &str, password: &str) -> JsonMessage {
+    pub fn get(&self, email: &str, password: &str, token:String) -> JsonMessage {
         if let Some(username) = self.is_authenticated(email, password) {
             return JsonMessage::User {
                 email: email.to_owned(),
-                auth_token: Self::tokenize(&username, email),
+                auth_token: token,
                 username,
             };
         }
         JsonMessage::Unauthorized
     }
 
-    fn tokenize(username: &str, email: &str) -> String {
-        let mc = new_magic_crypt!(email, 256);
-        mc.encrypt_bytes_to_base64(username)
-    }
-
-    pub fn new_user(&self, username: String, email: String, password: String) -> JsonMessage {
+    pub fn new_user(&self, username: String, email: String, password: String, token:String) -> JsonMessage {
         if self.email_check.is_match(&email) {
             return JsonMessage::NotAnEmail;
         }
@@ -61,7 +55,7 @@ impl Users {
                     if let Ok(maybe_record) = self.db.insert(&email, value.as_bytes()) {
                         if maybe_record.is_some() {
                             return JsonMessage::User {
-                                auth_token: Self::tokenize(&username, &email),
+                                auth_token: token,
                                 email,
                                 username,
                             };
@@ -69,6 +63,8 @@ impl Users {
                     }
                 }
             }
+        } else {
+            return JsonMessage::EmailAlreadyInUse;
         }
         JsonMessage::ServerErrror
     }

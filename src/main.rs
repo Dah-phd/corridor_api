@@ -4,7 +4,7 @@ mod quoridor;
 mod state;
 use axum::http::StatusCode;
 //internals
-use messages::{JsonMessage, PlayerMove, PlayerMoveResult, UserCreate, UserLogin};
+use messages::{JsonMessage, PlayerMove, PlayerMoveResult, UserCreate, UserLogin, GuestLogin, UserContext};
 use state::AppState;
 //std
 use std::sync::Arc;
@@ -27,18 +27,8 @@ async fn login(
     cookies: Cookies,
     Json(payload): Json<UserLogin>,
 ) -> Json<JsonMessage> {
-    let maybe_user = app_state.users().get(&payload.email, &payload.password);
-    if let JsonMessage::User {
-        email: _,
-        username: _,
-        auth_token,
-    } = &maybe_user
-    {
-        app_state
-            .sessions
-            .lock()
-            .expect("DEADLOCK on sessions!")
-            .insert(auth_token.clone(), maybe_user.clone());
+    let maybe_user = app_state.user_get_with_session(&payload.email, &payload.password);
+    if let JsonMessage::User { auth_token, .. } = &maybe_user {
         cookies.add(Cookie::new(TOKEN.to_owned(), auth_token.to_owned()));
     }
     maybe_user.into()
@@ -48,11 +38,7 @@ async fn logout(State(app_state): State<Arc<AppState>>, cookies: Cookies) -> Sta
     let maybe_token = cookies.get(TOKEN);
     cookies.remove(Cookie::named(TOKEN));
     if let Some(token) = maybe_token {
-        app_state
-            .sessions
-            .lock()
-            .expect("DEADLOCK in sessions!")
-            .remove(token.value());
+        app_state.user_end_session(token)
     }
     StatusCode::OK
 }
@@ -60,18 +46,36 @@ async fn logout(State(app_state): State<Arc<AppState>>, cookies: Cookies) -> Sta
 async fn login_guest(
     State(app_state): State<Arc<AppState>>,
     cookies: Cookies,
-    Json(payload): Json<UserLogin>,
-) {
+    Json(payload): Json<GuestLogin>,
+) -> Json<JsonMessage> {
+    let maybe_user = app_state.user_guest_session(payload.username);
+    if let JsonMessage::User {auth_token, ..} = &maybe_user {
+        cookies.add(Cookie::new(TOKEN, auth_token.to_owned()))
+    };
+    maybe_user.into()
 }
 
 async fn create_user(
     State(app_state): State<Arc<AppState>>,
     Json(payload): Json<UserCreate>,
 ) -> Json<JsonMessage> {
-    let users = app_state.users();
-    users
-        .new_user(payload.username, payload.email, payload.password)
+    app_state
+        .user_create_with_session(payload.username, payload.email, payload.password)
         .into()
+}
+
+async fn auth_context(State(app_state): State<Arc<AppState>>, cookies: Cookies) -> Json<UserContext> {
+    let maybe_user = app_state.get_session(cookies.get(TOKEN));
+    let mut game = JsonMessage::NotFound;
+    if let JsonMessage::User { email, ..} = &maybe_user {
+        if let Some(active_game) = app_state.quoridor_get_state_by_player(email) {
+            game = JsonMessage::QuoridorID(active_game);
+        }
+    }
+    UserContext{
+        user:maybe_user,
+        active_match: game
+    }.into()
 }
 
 //chat
@@ -194,14 +198,36 @@ async fn quoridor_que(
             if let JsonMessage::User { email, .. } = app_state.get_session(cookies.get(TOKEN)) {
                 email
             } else {
+                if let Ok(msg) = to_string(&JsonMessage::Unauthorized) {
+                    let _ = socket.send(msg.into()).await;
+                }
                 return;
             };
+        if let Some(game_id) = app_state.quoridor_que_check(player.to_owned()) {
+            if let Ok(msg) = to_string(&JsonMessage::QuoridorID(game_id.to_owned())) {
+                if let Err(_data) = socket.send(msg.into()).await {
+                    app_state.quoridor_drop_by_id(&game_id);
+                }
+            }
+            return;
+        }
         let (sender, receiver) = tokio::sync::oneshot::channel::<String>();
+        app_state.quoridor_que_join(player, sender);
 
         match receiver.await {
-            Ok(msg) => return,
-            Err(_) => return,
-        }
+            Ok(game_id) => {
+                if let Ok(msg) = to_string(&JsonMessage::QuoridorID(game_id.to_owned())) {
+                    if let Err(_data) = socket.send(msg.into()).await {
+                        app_state.quoridor_drop_by_id(&game_id)
+                    }
+                }
+            }
+            Err(_data) => {
+                if let Ok(msg) = to_string(&JsonMessage::ServerErrror) {
+                    let _ = socket.send(msg.into()).await;
+                }
+            }
+        };
     })
 }
 
@@ -285,6 +311,8 @@ async fn main() {
 
     let app = Router::new()
         .route("/auth/login", post(login))
+        .route("/auth/guest_login", post(login_guest))
+        .route("/auth/context", get(auth_context))
         .route("/auth/logout", delete(logout))
         .route("/auth/register", post(create_user))
         .route("/quoridor_solo", get(quoridor_cpu))
