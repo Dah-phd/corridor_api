@@ -2,19 +2,20 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 extern crate rand;
 use crate::auth::Users;
-use crate::game_lobbies::Lobby;
 use crate::messages::{JsonMessage, PlayerMove, PlayerMoveResult};
 use crate::quoridor::QuoridorMatch;
 use rand::{distributions::Alphanumeric, Rng};
 use tokio::sync::broadcast;
+use tower_cookies::Cookie;
 
 const ID_LEN: usize = 8;
+
 type QuoridorPackage = (QuoridorMatch, broadcast::Sender<QuoridorMatch>);
 
 #[derive(Default)]
 pub struct AppState {
     quoridor_games: Arc<Mutex<HashMap<String, QuoridorPackage>>>,
-    lobbies: Arc<Mutex<HashMap<String, Lobby>>>,
+    pub quoridor_que: Arc<Mutex<Option<tokio::sync::oneshot::Sender<String>>>>,
     pub users: Arc<Mutex<Users>>,
     pub sessions: Arc<Mutex<HashMap<String, JsonMessage>>>,
 }
@@ -24,33 +25,35 @@ impl AppState {
         Arc::new(Self::default())
     }
 
-    pub fn new_lobby(&self, email: String) -> JsonMessage {
-        let mut id = generate_id(ID_LEN);
-        let mut lobbies = self.lobbies.lock().expect("DEADLOCK on lobbies!");
-        while lobbies.contains_key(&id) {
-            id = generate_id(ID_LEN)
+    pub fn get_session(&self, cookie: Option<Cookie>) -> JsonMessage {
+        if let Some(token) = cookie {
+            if let Some(user) = self
+                .sessions
+                .lock()
+                .expect("DEADLOCK on sessions!")
+                .get(token.value())
+            {
+                return user.clone();
+            }
         }
-        lobbies.insert(id.to_owned(), Lobby::new(email));
-        JsonMessage::LobbyID(id)
+        JsonMessage::Unauthorized
     }
 
-    pub fn join_lobby(&self, email: String, id: &str) -> Option<String> {
-        let mut lobbies = self.lobbies.lock().expect("DEADLOCK on lobbies!");
-        if let Some(lobby) = lobbies.get_mut(id) {
-            lobby.player_list.push(email);
-            self.quoridor_new_game(lobby)
-        } else {
-            None
-        }
+    pub fn users(&self) -> MutexGuard<Users> {
+        self.users.lock().expect("DEADLOCK on users!")
     }
 
-    fn quoridor_new_game(&self, lobby: &mut Lobby) -> Option<String> {
-        if lobby.player_list.is_empty() {
+    pub fn quoridor_que_join(&self, user: String) {
+        let maybe_sender = self.quoridor_que.lock().expect("DEADLOCK on quoridor_que!");
+    }
+
+    pub fn quoridor_new_game(&self, lobby: &Vec<String>) -> Option<String> {
+        if lobby.is_empty() {
             return None;
         }
         let (channel, _) = broadcast::channel::<QuoridorMatch>(1);
         let mut id = generate_id(ID_LEN);
-        let new_game = QuoridorMatch::new(&lobby.player_list);
+        let new_game = QuoridorMatch::new(lobby);
         let mut games = self.quoridor_games.lock().expect("DEADLOCK on games!");
         while games.contains_key(&id) {
             id = generate_id(ID_LEN)
@@ -58,10 +61,6 @@ impl AppState {
         games
             .insert(id.to_owned(), (new_game, channel))
             .map(|_| id.to_owned())
-    }
-
-    pub fn users(&self) -> MutexGuard<Users> {
-        self.users.lock().expect("DEADLOCK on users!")
     }
 
     pub fn quoridor_get_state_by_id(&self, id: &str) -> Option<QuoridorMatch> {
@@ -85,7 +84,7 @@ impl AppState {
             .cloned()
     }
 
-    pub fn make_quoridor_move(
+    pub fn quoridor_make_move(
         &self,
         id: &str,
         player_move: PlayerMove,
@@ -97,7 +96,7 @@ impl AppState {
             .map(|(game, _)| game.make_move(player_move, player))
     }
 
-    pub fn drop_by_id(&self, id: &str) {
+    pub fn quoridor_drop_by_id(&self, id: &str) {
         let mut games = self.quoridor_games.lock().expect("DEADLOCK on games!");
         games.remove(id);
     }
@@ -106,12 +105,10 @@ impl AppState {
         let mut games = self.quoridor_games.lock().expect("DEADLOCK on games!");
         games.retain(|_key, (game, _)| game.get_winner().is_none() || !game.is_expaired());
         drop(games);
-        let mut lobbies = self.lobbies.lock().expect("DEADLOCK on lobbies!");
-        lobbies.retain(|_key, lobby| !lobby.is_expaired());
     }
 }
 
-pub fn generate_id(len: usize) -> String {
+fn generate_id(len: usize) -> String {
     let s: String = rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(len)

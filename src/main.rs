@@ -1,18 +1,21 @@
-mod game_lobbies;
-use serde_json::{from_str, to_string};
-use std::sync::Arc;
-mod messages;
-use axum::response::Response;
-use messages::{JsonMessage, PlayerMove, PlayerMoveResult, UserCreate, UserLogin};
 mod auth;
+mod messages;
 mod quoridor;
 mod state;
+use axum::http::StatusCode;
+//internals
+use messages::{JsonMessage, PlayerMove, PlayerMoveResult, UserCreate, UserLogin};
+use state::AppState;
+//std
+use std::sync::Arc;
+// extern creates
 use axum::extract::ws::{WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, State};
-use axum::routing::{get, post};
+use axum::response::Response;
+use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use futures::{sink::SinkExt, stream::StreamExt};
-use state::AppState;
+use serde_json::{from_str, to_string};
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
 
 const TOKEN: &str = "auth_token";
@@ -38,8 +41,7 @@ async fn login(
     cookies: Cookies,
     Json(payload): Json<UserLogin>,
 ) -> Json<JsonMessage> {
-    let users = app_state.users();
-    let maybe_user = users.get(&payload.email, &payload.password);
+    let maybe_user = app_state.users().get(&payload.email, &payload.password);
     if let JsonMessage::User {
         email: _,
         username: _,
@@ -56,6 +58,26 @@ async fn login(
     maybe_user.into()
 }
 
+async fn logout(State(app_state): State<Arc<AppState>>, cookies: Cookies) -> StatusCode {
+    let maybe_token = cookies.get(TOKEN);
+    cookies.remove(Cookie::named(TOKEN));
+    if let Some(token) = maybe_token {
+        app_state
+            .sessions
+            .lock()
+            .expect("DEADLOCK in sessions!")
+            .remove(token.value());
+    }
+    StatusCode::OK
+}
+
+async fn login_guest(
+    State(app_state): State<Arc<AppState>>,
+    cookies: Cookies,
+    Json(payload): Json<UserLogin>,
+) {
+}
+
 async fn create_user(
     State(app_state): State<Arc<AppState>>,
     Json(payload): Json<UserCreate>,
@@ -64,21 +86,6 @@ async fn create_user(
     users
         .new_user(payload.username, payload.email, payload.password)
         .into()
-}
-
-async fn create_lobby(
-    State(app_state): State<Arc<AppState>>,
-    cookies: Cookies,
-) -> Json<JsonMessage> {
-    if let Some(JsonMessage::User {
-        email,
-        username: _,
-        auth_token: _,
-    }) = verify_cookie(cookies.get(TOKEN), app_state.clone())
-    {
-        return app_state.new_lobby(email).into();
-    }
-    JsonMessage::Unauthorized.into()
 }
 
 //chat
@@ -122,29 +129,6 @@ async fn create_lobby(
 //         }
 //     }
 // }
-
-// lobbies
-
-async fn join_lobby(
-    State(app_state): State<Arc<AppState>>,
-    Path(id): Path<String>,
-    cookies: Cookies,
-) -> Json<JsonMessage> {
-    if let Some(JsonMessage::User {
-        email,
-        username: _,
-        auth_token: _,
-    }) = verify_cookie(cookies.get(TOKEN), app_state.clone())
-    {
-        if let Some(game_id) = app_state.join_lobby(email, &id) {
-            JsonMessage::QuoridorID(game_id).into()
-        } else {
-            JsonMessage::AlreadyStarted.into()
-        }
-    } else {
-        JsonMessage::Unauthorized.into()
-    }
-}
 
 // #[get("/join/<owner>")]
 // async fn join_lobby(
@@ -199,6 +183,46 @@ async fn join_lobby(
 
 // sessions
 
+async fn quoridor_cpu(
+    cookies: Cookies,
+    State(app_state): State<Arc<AppState>>,
+) -> Json<JsonMessage> {
+    if let JsonMessage::User { email, .. } = app_state.get_session(cookies.get(TOKEN)) {
+        if let Some(game_id) = app_state.quoridor_new_game(&vec![email]) {
+            JsonMessage::QuoridorID(game_id).into()
+        } else {
+            JsonMessage::ServerErrror.into()
+        }
+    } else {
+        JsonMessage::Unauthorized.into()
+    }
+}
+
+async fn quoridor_que(
+    cookies: Cookies,
+    ws: WebSocketUpgrade,
+    State(app_state): State<Arc<AppState>>,
+) -> Response {
+    ws.on_upgrade(|mut socket| async move {
+        let player = if let Some(JsonMessage::User {
+            username: _,
+            email,
+            auth_token: _,
+        }) = verify_cookie(cookies.get(TOKEN), app_state.clone())
+        {
+            email
+        } else {
+            return;
+        };
+        let (sender, receiver) = tokio::sync::oneshot::channel::<String>();
+
+        match receiver.await {
+            Ok(msg) => return,
+            Err(_) => return,
+        }
+    })
+}
+
 async fn quoridor_game(
     cookies: Cookies,
     ws: WebSocketUpgrade,
@@ -245,7 +269,7 @@ async fn quoridor_game(
                 if let Ok(msg) = msg.into_text() {
                     if let Ok(player_move) = from_str::<PlayerMove>(&msg) {
                         if let Some(result) =
-                            app_state.make_quoridor_move(&id, player_move, &player)
+                            app_state.quoridor_make_move(&id, player_move, &player)
                         {
                             if matches!(result, PlayerMoveResult::Ok) {
                                 if let Some(game) = app_state.quoridor_get_state_by_id(&id) {
@@ -283,9 +307,10 @@ async fn main() {
 
     let app = Router::new()
         .route("/auth/login", post(login))
+        .route("/auth/logout", delete(logout))
         .route("/auth/register", post(create_user))
-        .route("/create_lobby", get(create_lobby))
-        .route("/join_lobby/:id", get(join_lobby))
+        .route("/quoridor_solo", get(quoridor_cpu))
+        .route("/quoridor_join", get(quoridor_que))
         .route("/quoridor_events/:id", get(quoridor_game))
         .with_state(state)
         .layer(CookieManagerLayer::new());

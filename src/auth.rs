@@ -1,5 +1,6 @@
 use bcrypt::{hash, verify, DEFAULT_COST};
 use magic_crypt::{new_magic_crypt, MagicCryptTrait};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
 
@@ -13,20 +14,20 @@ struct UserData {
 
 pub struct Users {
     db: sled::Db,
+    email_check: Regex,
 }
 
 impl Default for Users {
     fn default() -> Self {
-        Self { db: sled::open("users").expect("Unable to start DB!") }
+        Self {
+            db: sled::open("users").expect("Unable to start DB!"),
+            email_check:Regex::new(r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})")
+            .expect("Regex creation should not fail!"),
+        }
     }
 }
 
 impl Users {
-    pub fn init() -> Result<Users, sled::Error> {
-        let db = sled::open("users")?;
-        Ok(Self { db })
-    }
-
     pub fn get(&self, email: &str, password: &str) -> JsonMessage {
         if let Some(username) = self.is_authenticated(email, password) {
             return JsonMessage::User {
@@ -44,6 +45,9 @@ impl Users {
     }
 
     pub fn new_user(&self, username: String, email: String, password: String) -> JsonMessage {
+        if self.email_check.is_match(&email) {
+            return JsonMessage::NotAnEmail;
+        }
         if let Ok(user_exists) = self.db.contains_key(&username) {
             if user_exists {
                 return JsonMessage::EmailAlreadyInUse;

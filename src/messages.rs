@@ -50,6 +50,8 @@ pub enum JsonMessage {
     LobbyID(String),
     QuoridorID(String),
     Unauthorized,
+    NotAnEmail,
+    ShouldNotBeEmail,
     EmailAlreadyInUse,
     ServerErrror,
     AlreadyStarted
