@@ -78,7 +78,7 @@ impl AppState {
     }
 
     pub fn user_guest_session(&self, username: String) -> JsonMessage {
-        if !Regex::new(
+        if Regex::new(
             r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
         )
         .unwrap()
