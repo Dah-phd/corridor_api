@@ -64,5 +64,5 @@ pub enum JsonMessage {
     NotAnEmail,
     ShouldNotBeEmail,
     EmailAlreadyInUse,
-    ServerErrror,
+    ServerError,
 }

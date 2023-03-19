@@ -125,11 +125,13 @@ impl AppState {
 
     pub fn quoridor_que_check(&self, player: String) -> Option<String> {
         let mut que = self.quoridor_que.lock().unwrap();
-        if let Some((qued_player, sender)) = que.drain(0..1).next() {
-            if let Some(game_id) = self.quoridor_new_game(&vec![qued_player, player]) {
-                if let Ok(..) = sender.send(game_id.to_owned()) {
-                    return Some(game_id);
-                }
+        if que.is_empty() {
+            return None;
+        }
+        let (qued_player, sender) = que.remove(0);
+        if let Some(game_id) = self.quoridor_new_game(&vec![qued_player, player]) {
+            if let Ok(..) = sender.send(game_id.to_owned()) {
+                return Some(game_id);
             }
         }
         None

@@ -66,7 +66,7 @@ impl Users {
         } else {
             return JsonMessage::EmailAlreadyInUse;
         }
-        JsonMessage::ServerErrror
+        JsonMessage::ServerError
     }
 
     pub fn is_authenticated(&self, email: &str, password: &str) -> Option<String> {

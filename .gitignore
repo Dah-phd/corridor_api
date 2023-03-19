@@ -2,3 +2,4 @@
 src/auth/secret_key.rs
 db.sqlite3
 /users
+/src/test

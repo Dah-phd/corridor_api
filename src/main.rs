@@ -4,7 +4,9 @@ mod quoridor;
 mod state;
 use axum::http::StatusCode;
 //internals
-use messages::{JsonMessage, PlayerMove, PlayerMoveResult, UserCreate, UserLogin, GuestLogin, UserContext};
+use messages::{
+    GuestLogin, JsonMessage, PlayerMove, PlayerMoveResult, UserContext, UserCreate, UserLogin,
+};
 use state::AppState;
 //std
 use std::sync::Arc;
@@ -49,7 +51,7 @@ async fn login_guest(
     Json(payload): Json<GuestLogin>,
 ) -> Json<JsonMessage> {
     let maybe_user = app_state.user_guest_session(payload.username);
-    if let JsonMessage::User {auth_token, ..} = &maybe_user {
+    if let JsonMessage::User { auth_token, .. } = &maybe_user {
         cookies.add(Cookie::new(TOKEN, auth_token.to_owned()))
     };
     maybe_user.into()
@@ -64,18 +66,22 @@ async fn create_user(
         .into()
 }
 
-async fn auth_context(State(app_state): State<Arc<AppState>>, cookies: Cookies) -> Json<UserContext> {
+async fn auth_context(
+    State(app_state): State<Arc<AppState>>,
+    cookies: Cookies,
+) -> Json<UserContext> {
     let maybe_user = app_state.get_session(cookies.get(TOKEN));
     let mut game = JsonMessage::NotFound;
-    if let JsonMessage::User { email, ..} = &maybe_user {
+    if let JsonMessage::User { email, .. } = &maybe_user {
         if let Some(active_game) = app_state.quoridor_get_state_by_player(email) {
             game = JsonMessage::QuoridorID(active_game);
         }
     }
-    UserContext{
-        user:maybe_user,
-        active_match: game
-    }.into()
+    UserContext {
+        user: maybe_user,
+        active_match: game,
+    }
+    .into()
 }
 
 //chat
@@ -181,7 +187,7 @@ async fn quoridor_cpu(
         if let Some(game_id) = app_state.quoridor_new_game(&vec![email]) {
             JsonMessage::QuoridorID(game_id).into()
         } else {
-            JsonMessage::ServerErrror.into()
+            JsonMessage::ServerError.into()
         }
     } else {
         JsonMessage::Unauthorized.into()
@@ -223,12 +229,19 @@ async fn quoridor_que(
                 }
             }
             Err(_data) => {
-                if let Ok(msg) = to_string(&JsonMessage::ServerErrror) {
+                if let Ok(msg) = to_string(&JsonMessage::ServerError) {
                     let _ = socket.send(msg.into()).await;
                 }
             }
         };
     })
+}
+
+async fn debug_index() -> axum::response::Html<String> {
+    let markup = tokio::fs::read_to_string("src/test/index.html")
+        .await
+        .unwrap();
+    axum::response::Html(markup)
 }
 
 async fn quoridor_game(
@@ -306,10 +319,12 @@ async fn main() {
         loop {
             state_for_thread.recurent_clean_up();
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+            println!("alive!");
         }
     });
 
     let app = Router::new()
+        .route("/", get(debug_index))
         .route("/auth/login", post(login))
         .route("/auth/guest_login", post(login_guest))
         .route("/auth/context", get(auth_context))
