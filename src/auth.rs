@@ -39,10 +39,10 @@ impl Users {
     }
 
     pub fn new_user(&self, username: String, email: String, password: String, token:String) -> JsonMessage {
-        if self.email_check.is_match(&email) {
+        if !self.email_check.is_match(&email) {
             return JsonMessage::NotAnEmail;
         }
-        if let Ok(user_exists) = self.db.contains_key(&username) {
+        if let Ok(user_exists) = self.db.contains_key(&email) {
             if user_exists {
                 return JsonMessage::EmailAlreadyInUse;
             }

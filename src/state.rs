@@ -157,9 +157,11 @@ impl AppState {
         while games.contains_key(&id) {
             id = generate_id(ID_LEN)
         }
-        games
-            .insert(id.to_owned(), (new_game, channel))
-            .map(|_| id.to_owned())
+        if games.insert(id.to_owned(), (new_game, channel)).is_some() {
+            None
+        } else {
+            Some(id)
+        }
     }
 
     pub fn quoridor_get_state_by_id(&self, id: &str) -> Option<QuoridorMatch> {
