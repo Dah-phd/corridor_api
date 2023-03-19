@@ -209,6 +209,7 @@ async fn quoridor_que(
                 }
                 return;
             };
+
         if let Some(game_id) = app_state.quoridor_que_check(player.to_owned()) {
             if let Ok(msg) = to_string(&JsonMessage::QuoridorID(game_id.to_owned())) {
                 if let Err(_data) = socket.send(msg.into()).await {
@@ -217,6 +218,7 @@ async fn quoridor_que(
             }
             return;
         }
+
         let (sender, receiver) = tokio::sync::oneshot::channel::<String>();
         app_state.quoridor_que_join(player, sender);
 
@@ -319,7 +321,6 @@ async fn main() {
         loop {
             state_for_thread.recurent_clean_up();
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-            println!("alive!");
         }
     });
 
