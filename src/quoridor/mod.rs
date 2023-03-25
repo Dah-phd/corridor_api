@@ -85,7 +85,7 @@ impl QuoridorMatch {
 impl QuoridorMatch {
     fn move_player(&mut self, player: &str, new_position: (usize, usize)) -> PlayerMoveResult {
         if self.current != player {
-            return PlayerMoveResult::WrongPlayerTurn;
+            return PlayerMoveResult::Disallowed(player.to_owned());
         }
         if player == self.up_player {
             if self.game.try_moving_up_player(new_position) {
@@ -96,7 +96,7 @@ impl QuoridorMatch {
             self.check_and_set_winner(&new_position, 0);
             return PlayerMoveResult::Ok;
         };
-        PlayerMoveResult::Disallowed
+        PlayerMoveResult::Disallowed(player.to_owned())
     }
 
     fn concede(&mut self, player: &str) -> PlayerMoveResult {
@@ -107,7 +107,7 @@ impl QuoridorMatch {
                 self.winner = Some(self.up_player.to_owned())
             }
         }
-        PlayerMoveResult::Ok
+        PlayerMoveResult::GameFinished
     }
 
     fn check_and_set_winner(&mut self, new_position: &(usize, usize), expected: usize) {
@@ -122,7 +122,7 @@ impl QuoridorMatch {
             return player_status;
         }
         if self.only_player_moves_allowed || !self.game.new_h_wall(position) {
-            return PlayerMoveResult::Disallowed;
+            return PlayerMoveResult::Disallowed(player.to_owned());
         };
         self.remove_border_from_player(player);
         player_status
@@ -134,7 +134,7 @@ impl QuoridorMatch {
             return player_status;
         }
         if self.only_player_moves_allowed || !self.game.new_v_wall(position) {
-            return PlayerMoveResult::Disallowed;
+            return PlayerMoveResult::Disallowed(player.to_owned());
         }
         self.remove_border_from_player(player);
         player_status
@@ -142,12 +142,12 @@ impl QuoridorMatch {
 
     fn player_is_valid(&self, player: &str) -> PlayerMoveResult {
         if player != self.current {
-            return PlayerMoveResult::WrongPlayerTurn;
+            return PlayerMoveResult::Disallowed(player.to_owned());
         }
         if player == self.up_player && 1 > self.game.up_player_free_walls
             || player == self.down_player && 1 > self.game.down_player_free_walls
         {
-            return PlayerMoveResult::Disallowed;
+            return PlayerMoveResult::Disallowed(player.to_owned());
         }
         PlayerMoveResult::Ok
     }

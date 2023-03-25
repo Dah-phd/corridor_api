@@ -40,9 +40,7 @@ pub enum PlayerMove {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum PlayerMoveResult {
     Ok,
-    WrongPlayerTurn,
-    Disallowed,
-    Unknown,
+    Disallowed(String),
     GameFinished,
 }
 
