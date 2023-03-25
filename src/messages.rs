@@ -1,4 +1,9 @@
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
+use axum::Json;
 use serde::{Deserialize, Serialize};
+
+use crate::quoridor::QuoridorMatch;
 
 #[derive(Deserialize)]
 pub struct UserLogin {
@@ -8,7 +13,7 @@ pub struct UserLogin {
 
 #[derive(Deserialize)]
 pub struct GuestLogin {
-    pub username: String
+    pub username: String,
 }
 
 #[derive(Deserialize)]
@@ -21,14 +26,8 @@ pub struct UserCreate {
 #[derive(Serialize)]
 pub struct UserContext {
     pub user: JsonMessage,
-    pub active_match: JsonMessage
+    pub active_match: JsonMessage,
 }
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum ChatID {
-    MatchID(String),
-}
-
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum PlayerMove {
@@ -45,6 +44,23 @@ pub enum PlayerMoveResult {
     Disallowed,
     Unknown,
     GameFinished,
+}
+
+#[derive(Serialize, Clone)]
+pub struct QuoridorMatchMeta{
+    id:String,
+    up_player:String,
+    down_player:String,
+}
+
+impl From<(String, QuoridorMatch)> for QuoridorMatchMeta {
+    fn from(value: (String, QuoridorMatch)) -> Self {
+        Self {
+            id: value.0,
+            up_player: value.1.up_player,
+            down_player: value.1.down_player
+        }
+    }
 }
 
 #[derive(Serialize, Clone)]
@@ -65,4 +81,44 @@ pub enum JsonMessage {
     ShouldNotBeEmail,
     EmailAlreadyInUse,
     ServerError,
+}
+
+impl IntoResponse for JsonMessage {
+    fn into_response(self) -> axum::response::Response {
+        let mut status_code = None;
+        let mut body: Option<Json<Self>> = None;
+        match self {
+            Self::User {..} => {
+                body.replace(self.into());
+            }
+            Self::ChatMessage {..} => {
+                body.replace(self.into());
+            }
+            Self::QuoridorID(..) => {
+                body.replace(self.into());
+            }
+            Self::Unauthorized => {
+                status_code.replace(StatusCode::FORBIDDEN);
+            }
+            Self::NotFound => {
+                status_code.replace(StatusCode::NOT_FOUND);
+            }
+            Self::NotAnEmail => {
+                body.replace(self.into());
+            }
+            Self::ShouldNotBeEmail => {
+                body.replace(self.into());
+            }
+            Self::EmailAlreadyInUse => {
+                body.replace(self.into());
+            }
+            Self::ServerError => {
+                status_code.replace(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        };
+        match body {
+            Some(data) => (status_code.unwrap_or(StatusCode::OK), data).into_response(),
+            None => status_code.unwrap_or(StatusCode::OK).into_response(),
+        }
+    }
 }

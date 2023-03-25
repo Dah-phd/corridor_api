@@ -11,8 +11,8 @@ const AFK_CC_TIMER: i64 = 180;
 pub struct QuoridorMatch {
     #[serde(skip_serializing)]
     timestamp: i64,
-    up_player: String,
-    down_player: String,
+    pub up_player: String,
+    pub down_player: String,
     game: Quoridor,
     turn: usize,
     current: String,

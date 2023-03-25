@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 extern crate rand;
 use crate::auth::Users;
-use crate::messages::{JsonMessage, PlayerMove, PlayerMoveResult};
+use crate::messages::{JsonMessage, PlayerMoveResult};
 use crate::quoridor::QuoridorMatch;
 use rand::{distributions::Alphanumeric, Rng};
 use regex::Regex;
@@ -14,12 +14,12 @@ const TOKEN_LEN: usize = 16;
 const SECONDS_IN_DAY: i64 = 24 * 60 * 60;
 
 type TimeStamp = i64;
-type QuoridorPackage = (QuoridorMatch, broadcast::Sender<QuoridorMatch>);
+type QuoridorPackage = (Arc<RwLock<QuoridorMatch>>, broadcast::Sender<PlayerMoveResult>);
 type QuoridorQue = Arc<Mutex<Vec<(String, tokio::sync::oneshot::Sender<String>)>>>;
 
 #[derive(Default)]
 pub struct AppState {
-    quoridor_games: Arc<Mutex<HashMap<String, QuoridorPackage>>>,
+    pub quoridor_games: Arc<Mutex<HashMap<String, QuoridorPackage>>>,
     pub quoridor_que: QuoridorQue,
     pub users: Arc<Mutex<Users>>,
     sessions: Arc<Mutex<HashMap<String, (JsonMessage, TimeStamp)>>>,
@@ -152,9 +152,9 @@ impl AppState {
         if lobby.is_empty() {
             return None;
         }
-        let (channel, _) = broadcast::channel::<QuoridorMatch>(1);
+        let (channel, _) = broadcast::channel::<PlayerMoveResult>(1);
         let mut id = generate_id(ID_LEN);
-        let new_game = QuoridorMatch::new(lobby);
+        let new_game = Arc::new(RwLock::new(QuoridorMatch::new(lobby)));
         let mut games = self.quoridor_games.lock().unwrap();
         while games.contains_key(&id) {
             id = generate_id(ID_LEN)
@@ -166,34 +166,16 @@ impl AppState {
         }
     }
 
-    pub fn quoridor_get_state_by_id(&self, id: &str) -> Option<QuoridorMatch> {
-        let games = self.quoridor_games.lock().unwrap();
-        games.get(id).map(|(game, _)| game.clone())
-    }
-
-    pub fn quoridor_get_state_by_player(&self, player: &str) -> Option<String> {
+    pub fn quoridor_get_id_by_player(&self, player: &str) -> Option<String> {
         let games = self.quoridor_games.lock().unwrap();
         games
             .iter()
-            .find(|(_key, (game, _))| game.contains_player(player))
+            .find(|(_key, (game, _))| game.read().unwrap().contains_player(player))
             .map(|(key, _game_package)| (key.clone()))
     }
 
     pub fn quoridor_get_full(&self, id: &str) -> Option<QuoridorPackage> {
         self.quoridor_games.lock().unwrap().get(id).cloned()
-    }
-
-    pub fn quoridor_make_move(
-        &self,
-        id: &str,
-        player_move: PlayerMove,
-        player: &str,
-    ) -> Option<PlayerMoveResult> {
-        self.quoridor_games
-            .lock()
-            .unwrap()
-            .get_mut(id)
-            .map(|(game, _)| game.make_move(player_move, player))
     }
 
     pub fn quoridor_drop_by_id(&self, id: &str) {
@@ -203,8 +185,9 @@ impl AppState {
     pub fn recurent_clean_up(&self) {
         let mut games = self.quoridor_games.lock().unwrap();
         games.retain(|_key, (game, sender)| {
+            let mut game = game.write().unwrap();
             game.timeout_guard();
-            let _ = sender.send(game.clone());
+            let _ = sender.send(PlayerMoveResult::Ok);
             game.get_winner().is_none()
         });
         drop(games);
