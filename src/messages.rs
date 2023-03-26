@@ -68,10 +68,6 @@ pub enum JsonMessage {
         username: String,
         auth_token: String,
     },
-    ChatMessage {
-        user: String,
-        msg: String,
-    },
     QuoridorID(String),
     Unauthorized,
     NotFound,
@@ -87,9 +83,6 @@ impl IntoResponse for JsonMessage {
         let mut body: Option<Json<Self>> = None;
         match self {
             Self::User {..} => {
-                body.replace(self.into());
-            }
-            Self::ChatMessage {..} => {
                 body.replace(self.into());
             }
             Self::QuoridorID(..) => {
