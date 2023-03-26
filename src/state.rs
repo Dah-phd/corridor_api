@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 extern crate rand;
 use crate::auth::Users;
-use crate::messages::{JsonMessage, PlayerMoveResult};
+use crate::messages::{ChatMessage, JsonMessage, PlayerMoveResult};
 use crate::quoridor::QuoridorMatch;
 use rand::{distributions::Alphanumeric, Rng};
 use regex::Regex;
@@ -14,13 +14,17 @@ const TOKEN_LEN: usize = 16;
 const SECONDS_IN_DAY: i64 = 24 * 60 * 60;
 
 type TimeStamp = i64;
-type QuoridorPackage = (Arc<RwLock<QuoridorMatch>>, broadcast::Sender<PlayerMoveResult>);
+type QuoridorPackage = (
+    Arc<RwLock<QuoridorMatch>>,
+    broadcast::Sender<PlayerMoveResult>,
+);
 type QuoridorQue = Arc<Mutex<Vec<(String, tokio::sync::oneshot::Sender<String>)>>>;
 
 #[derive(Default)]
 pub struct AppState {
     pub quoridor_games: Arc<Mutex<HashMap<String, QuoridorPackage>>>,
     pub quoridor_que: QuoridorQue,
+    pub chat_channel: Arc<RwLock<HashMap<String, broadcast::Sender<ChatMessage>>>>,
     pub users: Arc<Mutex<Users>>,
     sessions: Arc<Mutex<HashMap<String, (JsonMessage, TimeStamp)>>>,
     pub guests: Arc<Mutex<HashMap<String, String>>>,
@@ -152,18 +156,20 @@ impl AppState {
         if lobby.is_empty() {
             return None;
         }
-        let (channel, _) = broadcast::channel::<PlayerMoveResult>(1);
+        let channel = broadcast::channel::<PlayerMoveResult>(1).0;
         let mut id = generate_id(ID_LEN);
         let new_game = Arc::new(RwLock::new(QuoridorMatch::new(lobby)));
         let mut games = self.quoridor_games.lock().unwrap();
         while games.contains_key(&id) {
             id = generate_id(ID_LEN)
         }
-        if games.insert(id.to_owned(), (new_game, channel)).is_some() {
-            None
-        } else {
-            Some(id)
-        }
+        games.insert(id.to_owned(), (new_game, channel));
+        drop(games);
+        self.chat_channel
+            .write()
+            .unwrap()
+            .insert(id.to_owned(), broadcast::channel::<ChatMessage>(50).0);
+        Some(id)
     }
 
     pub fn quoridor_get_id_by_player(&self, player: &str) -> Option<String> {
@@ -183,18 +189,22 @@ impl AppState {
     }
 
     pub fn recurent_clean_up(&self) {
+        let mut chats_to_drop = Vec::new();
         let mut games = self.quoridor_games.lock().unwrap();
-        games.retain(|_key, (game, sender)| {
+        games.retain(|key, (game, sender)| {
             let mut game = game.write().unwrap();
             game.timeout_guard();
             let _ = sender.send(PlayerMoveResult::Ok);
-            game.get_winner().is_none()
+            if game.get_winner().is_some() {
+                chats_to_drop.push(key.to_owned());
+                false
+            } else {
+                true
+            }
         });
         drop(games);
-        let mut sessions = self.sessions.lock().unwrap();
-        sessions
-            .retain(|_, (_, stamp)| *stamp > chrono::Utc::now().timestamp() - 7 * SECONDS_IN_DAY);
-        drop(sessions)
+        self.sessions.lock().unwrap().retain(|_, (_, stamp)| *stamp > chrono::Utc::now().timestamp() - 7 * SECONDS_IN_DAY);
+        self.chat_channel.write().unwrap().retain(|key, _| !chats_to_drop.contains(key));
     }
 }
 

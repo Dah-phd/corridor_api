@@ -29,6 +29,13 @@ pub struct UserContext {
     pub active_match: JsonMessage,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ChatMessage {
+    pub user: String,
+    pub message: String,
+    pub timestamp: i64,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum PlayerMove {
     Concede,
@@ -45,10 +52,10 @@ pub enum PlayerMoveResult {
 }
 
 #[derive(Serialize, Clone)]
-pub struct QuoridorMatchMeta{
-    id:String,
-    up_player:String,
-    down_player:String,
+pub struct QuoridorMatchMeta {
+    id: String,
+    up_player: String,
+    down_player: String,
 }
 
 impl From<(String, QuoridorMatch)> for QuoridorMatchMeta {
@@ -56,7 +63,7 @@ impl From<(String, QuoridorMatch)> for QuoridorMatchMeta {
         Self {
             id: value.0,
             up_player: value.1.up_player,
-            down_player: value.1.down_player
+            down_player: value.1.down_player,
         }
     }
 }
@@ -82,7 +89,7 @@ impl IntoResponse for JsonMessage {
         let mut status_code = None;
         let mut body: Option<Json<Self>> = None;
         match self {
-            Self::User {..} => {
+            Self::User { .. } => {
                 body.replace(self.into());
             }
             Self::QuoridorID(..) => {

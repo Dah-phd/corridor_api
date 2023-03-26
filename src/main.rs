@@ -21,6 +21,8 @@ use futures::{sink::SinkExt, stream::StreamExt};
 use serde_json::{from_str, to_string};
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
 
+use crate::messages::ChatMessage;
+
 const TOKEN: &str = "auth_token";
 
 //support
@@ -162,6 +164,59 @@ async fn quoridor_get_matches(cookies: Cookies, State(app_state): State<Arc<AppS
     };
 }
 
+async fn join_chat(
+    cookies: Cookies,
+    ws: WebSocketUpgrade,
+    Path(id): Path<String>,
+    State(app_state): State<Arc<AppState>>,
+) -> Response {
+    let session = app_state.get_session(cookies.get(TOKEN));
+    let player = if let JsonMessage::User { email, .. } = session {
+        email
+    } else {
+        return session.into_response();
+    };
+
+    let channel_send = if let Some(channel) = app_state.chat_channel.read().unwrap().get(&id) {
+        channel.clone()
+    } else {
+        return JsonMessage::NotFound.into_response();
+    };
+
+    ws.on_upgrade(|socket: WebSocket| async move {
+        let mut channel_recv = channel_send.subscribe();
+        let (mut sender, mut reciever) = socket.split();
+
+        let mut send_task = tokio::spawn(async move {
+            while let Ok(message) = channel_recv.recv().await {
+                if let Ok(json_msg) = to_string(&message) {
+                    let _ = sender.send(json_msg.into()).await;
+                }
+            }
+        });
+        let mut recv_task = tokio::spawn(async move {
+            while let Some(Ok(payload)) = reciever.next().await {
+                if let Ok(json_message) = payload.into_text() {
+                    if let Ok(chat_message) = from_str::<ChatMessage>(&json_message) {
+                        if chat_message.user == player {
+                            let _ = channel_send.send(chat_message);
+                        }
+                    }
+                }
+            }
+        });
+
+        tokio::select! {
+            _rv_a = (&mut send_task) => {
+                recv_task.abort();
+            },
+            _rv_b = (&mut recv_task) => {
+                send_task.abort();
+            }
+        }
+    })
+}
+
 async fn quoridor_game(
     cookies: Cookies,
     ws: WebSocketUpgrade,
@@ -192,7 +247,7 @@ async fn quoridor_game(
         let sender_game = Arc::clone(&game);
         let player_send = player_recv.to_owned();
 
-        let mut sender_task = tokio::spawn(async move {
+        let mut send_task = tokio::spawn(async move {
             while let Ok(msg) = channel_recv.recv().await {
                 let game_snapshot = to_string(&sender_game.read().unwrap().clone());
                 if let Ok(snapshot) = game_snapshot {
@@ -211,7 +266,8 @@ async fn quoridor_game(
             while let Some(Ok(msg)) = reciever.next().await {
                 if let Ok(msg) = msg.into_text() {
                     if let Ok(player_move) = from_str::<PlayerMove>(&msg) {
-                        let move_result = game.write().unwrap().make_move(player_move, &player_recv);
+                        let move_result =
+                            game.write().unwrap().make_move(player_move, &player_recv);
                         let _ = channel_send.send(move_result);
                     }
                 }
@@ -219,11 +275,11 @@ async fn quoridor_game(
         });
 
         tokio::select! {
-            _rv_a = (&mut sender_task) => {
+            _rv_a = (&mut send_task) => {
                 recv_task.abort();
             },
             _rv_b = (&mut recv_task) => {
-                sender_task.abort();
+                send_task.abort();
             }
         }
     })
@@ -248,6 +304,7 @@ async fn main() {
         .route("/auth/context", get(auth_context))
         .route("/auth/logout", delete(logout))
         .route("/auth/register", post(create_user))
+        .route("/quoridor/chat", get(join_chat))
         .route("/quoridor/matches", get(quoridor_get_matches))
         .route("/quoridor/solo", get(quoridor_cpu))
         .route("/quoridor/join", get(quoridor_que))
