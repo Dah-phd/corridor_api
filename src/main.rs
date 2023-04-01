@@ -245,15 +245,11 @@ async fn quoridor_game(
         let mut channel_recv = channel_send.subscribe();
         let (mut sender, mut reciever) = socket.split();
         let sender_game = Arc::clone(&game);
-        let player_send = player_recv.to_owned();
 
         let mut send_task = tokio::spawn(async move {
             while let Ok(msg) = channel_recv.recv().await {
                 let game_snapshot = to_string(&sender_game.read().unwrap().clone());
                 if let Ok(snapshot) = game_snapshot {
-                    if matches!(&msg, PlayerMoveResult::Disallowed(name) if name == &player_send) {
-                        continue;
-                    }
                     let _ = sender.send(snapshot.into()).await;
                     if matches!(msg, PlayerMoveResult::GameFinished) {
                         return;
