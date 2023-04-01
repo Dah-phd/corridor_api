@@ -44,7 +44,7 @@ impl Users {
         }
         if let Ok(user_exists) = self.db.contains_key(&email) {
             if user_exists {
-                return JsonMessage::EmailAlreadyInUse;
+                return JsonMessage::AlreadyTaken;
             }
             if let Ok(password_hash) = hash(password, DEFAULT_COST) {
                 let user_payload = UserData {
@@ -64,7 +64,7 @@ impl Users {
                 }
             }
         } else {
-            return JsonMessage::EmailAlreadyInUse;
+            return JsonMessage::AlreadyTaken;
         }
         JsonMessage::ServerError
     }

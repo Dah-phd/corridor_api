@@ -2,7 +2,6 @@ mod auth;
 mod messages;
 mod quoridor;
 mod state;
-use axum::http::StatusCode;
 //internals
 use messages::{
     GuestLogin, JsonMessage, PlayerMove, PlayerMoveResult, QuoridorMatchMeta, UserContext,
@@ -17,6 +16,7 @@ use axum::extract::{Path, State};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
+use axum::http::StatusCode;
 use futures::{sink::SinkExt, stream::StreamExt};
 use serde_json::{from_str, to_string};
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};

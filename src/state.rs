@@ -27,7 +27,6 @@ pub struct AppState {
     pub chat_channel: Arc<RwLock<HashMap<String, broadcast::Sender<ChatMessage>>>>,
     pub users: Arc<Mutex<Users>>,
     sessions: Arc<Mutex<HashMap<String, (JsonMessage, TimeStamp)>>>,
-    pub guests: Arc<Mutex<HashMap<String, String>>>,
 }
 
 impl AppState {
@@ -91,13 +90,11 @@ impl AppState {
             return JsonMessage::ShouldNotBeEmail;
         }
         let mut sessions = self.sessions.lock().unwrap();
-        if sessions.iter().any(|(_, (game, ..))| {
-            if let JsonMessage::User { email, .. } = game {
-                email == &username
-            } else {
-                false
-            }
-        }) {}
+        if sessions.iter().any(|(_, (user, ..))| {
+            matches!(&user, JsonMessage::User { email, ..} if email == &username)
+        }) {
+            return JsonMessage::AlreadyTaken
+        }
         let mut token = generate_id(TOKEN_LEN);
         while sessions.contains_key(&token) {
             token = generate_id(TOKEN_LEN)

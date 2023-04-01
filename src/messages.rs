@@ -80,7 +80,7 @@ pub enum JsonMessage {
     NotFound,
     NotAnEmail,
     ShouldNotBeEmail,
-    EmailAlreadyInUse,
+    AlreadyTaken,
     ServerError,
 }
 
@@ -107,7 +107,7 @@ impl IntoResponse for JsonMessage {
             Self::ShouldNotBeEmail => {
                 body.replace(self.into());
             }
-            Self::EmailAlreadyInUse => {
+            Self::AlreadyTaken => {
                 body.replace(self.into());
             }
             Self::ServerError => {
