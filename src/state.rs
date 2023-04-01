@@ -90,10 +90,10 @@ impl AppState {
             return JsonMessage::ShouldNotBeEmail;
         }
         let mut sessions = self.sessions.lock().unwrap();
-        if sessions.iter().any(|(_, (user, ..))| {
-            matches!(&user, JsonMessage::User { email, ..} if email == &username)
-        }) {
-            return JsonMessage::AlreadyTaken
+        if sessions.iter().any(
+            |(_, (user, ..))| matches!(&user, JsonMessage::User { email, ..} if email == &username),
+        ) {
+            return JsonMessage::AlreadyTaken;
         }
         let mut token = generate_id(TOKEN_LEN);
         while sessions.contains_key(&token) {
@@ -200,8 +200,14 @@ impl AppState {
             }
         });
         drop(games);
-        self.sessions.lock().unwrap().retain(|_, (_, stamp)| *stamp > chrono::Utc::now().timestamp() - 7 * SECONDS_IN_DAY);
-        self.chat_channel.write().unwrap().retain(|key, _| !chats_to_drop.contains(key));
+        self.sessions
+            .lock()
+            .unwrap()
+            .retain(|_, (_, stamp)| *stamp > chrono::Utc::now().timestamp() - 7 * SECONDS_IN_DAY);
+        self.chat_channel
+            .write()
+            .unwrap()
+            .retain(|key, _| !chats_to_drop.contains(key));
     }
 }
 

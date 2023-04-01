@@ -27,7 +27,7 @@ impl Default for Users {
 }
 
 impl Users {
-    pub fn get(&self, email: &str, password: &str, token:String) -> JsonMessage {
+    pub fn get(&self, email: &str, password: &str, token: String) -> JsonMessage {
         if let Some(username) = self.is_authenticated(email, password) {
             return JsonMessage::User {
                 email: email.to_owned(),
@@ -38,7 +38,13 @@ impl Users {
         JsonMessage::Unauthorized
     }
 
-    pub fn new_user(&self, username: String, email: String, password: String, token:String) -> JsonMessage {
+    pub fn new_user(
+        &self,
+        username: String,
+        email: String,
+        password: String,
+        token: String,
+    ) -> JsonMessage {
         if !self.email_check.is_match(&email) {
             return JsonMessage::NotAnEmail;
         }

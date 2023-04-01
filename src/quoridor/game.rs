@@ -1,6 +1,5 @@
 use serde::Serialize;
 
-
 #[derive(Debug, Serialize, Clone)]
 pub struct Quoridor {
     pub up_player: (usize, usize),

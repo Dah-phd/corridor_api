@@ -43,8 +43,7 @@ impl QuoridorMatch {
     }
 
     pub fn timeout_guard(&mut self) {
-        if self.get_timestamp() + AFK_CC_TIMER < chrono::Utc::now().timestamp()
-        {
+        if self.get_timestamp() + AFK_CC_TIMER < chrono::Utc::now().timestamp() {
             self.make_move(PlayerMove::Concede, &self.current.clone());
         }
     }
