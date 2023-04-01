@@ -198,11 +198,13 @@ async fn join_chat(
             while let Some(Ok(payload)) = reciever.next().await {
                 if let Ok(json_message) = payload.into_text() {
                     if let Ok(chat_message) = from_str::<ChatMessage>(&json_message) {
-                        if chat_message.user == player {
+                        if matches!(&chat_message, ChatMessage::Message { user, .. } if user == &player) {
                             let _ = channel_send.send(chat_message);
+                            continue;
                         }
                     }
                 }
+                let _ = channel_send.send(ChatMessage::MessageError(player.to_owned())); // might remove it if unused by frontend
             }
         });
 

@@ -30,10 +30,13 @@ pub struct UserContext {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct ChatMessage {
-    pub user: String,
-    pub message: String,
-    pub timestamp: i64,
+pub enum ChatMessage {
+    Message {
+        user: String,
+        message: String,
+        timestamp: i64,
+    },
+    MessageError(String),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
