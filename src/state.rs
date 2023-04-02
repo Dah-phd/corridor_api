@@ -18,7 +18,7 @@ type QuoridorPackage = (
     Arc<RwLock<QuoridorMatch>>,
     broadcast::Sender<PlayerMoveResult>,
 );
-type QuoridorQue = Arc<Mutex<Vec<(String, tokio::sync::oneshot::Sender<String>)>>>;
+type QuoridorQue = Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<String>>>>;
 
 #[derive(Default)]
 pub struct AppState {
@@ -122,31 +122,6 @@ impl AppState {
             }
         }
         JsonMessage::Unauthorized
-    }
-
-    pub fn quoridor_que_check(&self, player: String) -> Option<String> {
-        let mut que = self.quoridor_que.lock().unwrap();
-        if que.is_empty() {
-            return None;
-        }
-        let (qued_player, sender) = que.remove(0);
-        if let Some(game_id) = self.quoridor_new_game(&vec![qued_player, player]) {
-            if let Ok(..) = sender.send(game_id.to_owned()) {
-                return Some(game_id);
-            }
-        }
-        None
-    }
-
-    pub fn quoridor_que_join(
-        &self,
-        new_peer: String,
-        new_sender: tokio::sync::oneshot::Sender<String>,
-    ) {
-        self.quoridor_que
-            .lock()
-            .unwrap()
-            .push((new_peer, new_sender));
     }
 
     pub fn quoridor_new_game(&self, lobby: &Vec<String>) -> Option<String> {

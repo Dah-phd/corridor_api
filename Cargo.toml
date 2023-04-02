@@ -21,3 +21,4 @@ bcrypt = "0.14.0"
 magic-crypt = "3.1.12"
 futures = "0.3"
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+tracing-subscriber = "0.3.16"
