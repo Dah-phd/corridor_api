@@ -3,7 +3,8 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
 
-use crate::messages::JsonMessage;
+use crate::errors::StateError;
+use crate::messages::UserContext;
 
 #[derive(Serialize, Deserialize)]
 struct UserData {
@@ -27,15 +28,19 @@ impl Default for Users {
 }
 
 impl Users {
-    pub fn get(&self, email: &str, password: &str, token: String) -> JsonMessage {
-        if let Some(username) = self.is_authenticated(email, password) {
-            return JsonMessage::User {
-                email: email.to_owned(),
-                auth_token: token,
-                username,
-            };
-        }
-        JsonMessage::Unauthorized
+    pub fn get(
+        &self,
+        email: &str,
+        password: &str,
+        token: String,
+    ) -> Result<UserContext, StateError> {
+        let user_data = self.is_authenticated(email, password)?;
+        Ok(UserContext {
+            email: email.to_owned(),
+            auth_token: token,
+            username: user_data.username,
+            active_match: None,
+        })
     }
 
     pub fn new_user(
@@ -44,49 +49,44 @@ impl Users {
         email: String,
         password: String,
         token: String,
-    ) -> JsonMessage {
+    ) -> Result<UserContext, StateError> {
         if !self.email_check.is_match(&email) {
-            return JsonMessage::NotAnEmail;
+            return Err(StateError::UnableToParse);
         }
-        if let Ok(user_exists) = self.db.contains_key(&email) {
-            if user_exists {
-                return JsonMessage::AlreadyTaken;
-            }
-            if let Ok(password_hash) = hash(password, DEFAULT_COST) {
-                let user_payload = UserData {
-                    username: username.to_owned(),
-                    password_hash,
-                };
-                if let Ok(value) = to_string(&user_payload) {
-                    if let Ok(maybe_record) = self.db.insert(&email, value.as_bytes()) {
-                        if maybe_record.is_some() {
-                            return JsonMessage::User {
-                                auth_token: token,
-                                email,
-                                username,
-                            };
-                        }
-                    }
-                }
-            }
-        } else {
-            return JsonMessage::AlreadyTaken;
+        if self
+            .db
+            .contains_key(&email)
+            .map_err(|_| StateError::ServerError)?
+        {
+            return Err(StateError::AlreadyTaken);
         }
-        JsonMessage::ServerError
+        let user_payload = UserData {
+            username: username.to_owned(),
+            password_hash: hash(password, DEFAULT_COST).map_err(|_| StateError::ServerError)?,
+        };
+        let user_json = to_string(&user_payload).map_err(|_| StateError::ServerError)?;
+        self.db
+            .insert(&email, user_json.as_bytes())
+            .map_err(|_| StateError::ServerError)?;
+        Ok(UserContext {
+            active_match: None,
+            auth_token: token,
+            email,
+            username,
+        })
     }
 
-    pub fn is_authenticated(&self, email: &str, password: &str) -> Option<String> {
-        if let Ok(Some(record)) = self.db.get(email) {
-            if let Ok(user_payload) = std::str::from_utf8(&record) {
-                if let Ok(user) = from_str::<UserData>(user_payload) {
-                    if let Ok(is_auth) = verify(password, &user.password_hash) {
-                        if is_auth {
-                            return Some(user.username);
-                        }
-                    }
-                }
-            }
+    fn is_authenticated(&self, email: &str, password: &str) -> Result<UserData, StateError> {
+        let record = self
+            .db
+            .get(email)
+            .map_err(|_| StateError::ServerError)?
+            .ok_or(StateError::NotFound)?;
+        let serialized_user = std::str::from_utf8(&record).map_err(|_| StateError::ServerError)?;
+        let user = from_str::<UserData>(serialized_user).map_err(|_| StateError::ServerError)?;
+        if verify(password, &user.password_hash).map_err(|_| StateError::ServerError)? {
+            return Ok(user);
         }
-        None
+        Err(StateError::Unauthorized)
     }
 }

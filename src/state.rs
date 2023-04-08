@@ -2,7 +2,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 extern crate rand;
 use crate::auth::Users;
-use crate::messages::{ChatMessage, JsonMessage, PlayerMoveResult};
+use crate::errors::StateError;
+use crate::messages::{ChatMessage, PlayerMoveResult, UserContext};
 use crate::quoridor::QuoridorMatch;
 use rand::{distributions::Alphanumeric, Rng};
 use regex::Regex;
@@ -26,7 +27,7 @@ pub struct AppState {
     pub quoridor_que: QuoridorQue,
     pub chat_channel: Arc<RwLock<HashMap<String, broadcast::Sender<ChatMessage>>>>,
     pub users: Arc<Mutex<Users>>,
-    sessions: Arc<Mutex<HashMap<String, (JsonMessage, TimeStamp)>>>,
+    sessions: Arc<Mutex<HashMap<String, (UserContext, TimeStamp)>>>,
 }
 
 impl AppState {
@@ -39,24 +40,26 @@ impl AppState {
         username: String,
         email: String,
         password: String,
-    ) -> JsonMessage {
+    ) -> Result<UserContext, StateError> {
         let mut token = generate_id(TOKEN_LEN);
         let mut sessions = self.sessions.lock().unwrap();
         while sessions.contains_key(&token) {
             token = generate_id(TOKEN_LEN)
         }
-        let user = self
-            .users
-            .lock()
-            .unwrap()
-            .new_user(username, email, password, token.to_owned());
-        if let JsonMessage::User { .. } = user {
-            sessions.insert(token, (user.clone(), chrono::Utc::now().timestamp()));
-        }
-        user
+        let user =
+            self.users
+                .lock()
+                .unwrap()
+                .new_user(username, email, password, token.to_owned())?;
+        sessions.insert(token, (user.clone(), chrono::Utc::now().timestamp()));
+        Ok(user)
     }
 
-    pub fn user_get_with_session(&self, email: &str, password: &str) -> JsonMessage {
+    pub fn user_get_with_session(
+        &self,
+        email: &str,
+        password: &str,
+    ) -> Result<UserContext, StateError> {
         let mut token = generate_id(TOKEN_LEN);
         let mut sessions = self.sessions.lock().unwrap();
         while sessions.contains_key(&token) {
@@ -66,11 +69,9 @@ impl AppState {
             .users
             .lock()
             .unwrap()
-            .get(email, password, token.to_owned());
-        if let JsonMessage::User { .. } = user {
-            sessions.insert(token, (user.clone(), chrono::Utc::now().timestamp()));
-        }
-        user
+            .get(email, password, token.to_owned())?;
+        sessions.insert(token, (user.clone(), chrono::Utc::now().timestamp()));
+        Ok(user)
     }
 
     pub fn user_end_session(&self, token: Cookie) {
@@ -80,29 +81,33 @@ impl AppState {
             .remove(token.value());
     }
 
-    pub fn user_guest_session(&self, username: String) -> JsonMessage {
+    pub fn user_guest_session(&self, username: String) -> Result<UserContext, StateError> {
         if Regex::new(
             r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
         )
         .unwrap()
         .is_match(&username)
         {
-            return JsonMessage::ShouldNotBeEmail;
+            return Err(StateError::UnsupportedDataType(
+                "Should not be email!".to_owned(),
+            ));
         }
         let mut sessions = self.sessions.lock().unwrap();
-        if sessions.iter().any(
-            |(_, (user, ..))| matches!(&user, JsonMessage::User { email, ..} if email == &username),
-        ) {
-            return JsonMessage::AlreadyTaken;
+        if sessions
+            .iter()
+            .any(|(_, (user, ..))| user.email == username)
+        {
+            return Err(StateError::AlreadyTaken);
         }
         let mut token = generate_id(TOKEN_LEN);
         while sessions.contains_key(&token) {
             token = generate_id(TOKEN_LEN)
         }
-        let user = JsonMessage::User {
+        let user = UserContext {
             email: username,
             username: "GUEST".to_owned(),
             auth_token: token.to_owned(),
+            active_match: None,
         };
         sessions.insert(
             token,
@@ -111,17 +116,19 @@ impl AppState {
                 chrono::Utc::now().timestamp() - SECONDS_IN_DAY * 6,
             ),
         );
-        user
+        Ok(user)
     }
 
-    pub fn get_session(&self, cookie: Option<Cookie>) -> JsonMessage {
-        if let Some(token) = cookie {
-            if let Some((user, stamp)) = self.sessions.lock().unwrap().get_mut(token.value()) {
+    pub fn get_session(&self, cookie: Option<Cookie>) -> Result<UserContext, StateError> {
+        self.sessions
+            .lock()
+            .unwrap()
+            .get_mut(cookie.ok_or(StateError::Unauthorized)?.value())
+            .ok_or(StateError::Unauthorized)
+            .map(|(context, stamp)| {
                 *stamp = chrono::Utc::now().timestamp();
-                return user.clone();
-            }
-        }
-        JsonMessage::Unauthorized
+                context.clone()
+            })
     }
 
     pub fn quoridor_new_game(&self, lobby: &Vec<String>) -> Option<String> {

@@ -1,10 +1,12 @@
 mod auth;
+mod errors;
 mod messages;
 mod quoridor;
 mod state;
 //internals
+use errors::StateError;
 use messages::{
-    ChatMessage, GuestLogin, JsonMessage, PlayerMove, PlayerMoveResult, QuoridorMatchMeta,
+    ChatMessage, GuestLogin, PlayerMove, PlayerMoveResult, QuoridorMatchMeta,
     UserContext, UserCreate, UserLogin,
 };
 use state::AppState;
@@ -28,12 +30,10 @@ async fn login(
     State(app_state): State<Arc<AppState>>,
     cookies: Cookies,
     Json(payload): Json<UserLogin>,
-) -> Response {
-    let maybe_user = app_state.user_get_with_session(&payload.email, &payload.password);
-    if let JsonMessage::User { auth_token, .. } = &maybe_user {
-        cookies.add(Cookie::new(TOKEN.to_owned(), auth_token.to_owned()));
-    }
-    maybe_user.into_response()
+) -> Result<Json<UserContext>, StateError> {
+    let user = app_state.user_get_with_session(&payload.email, &payload.password)?;
+    cookies.add(Cookie::new(TOKEN.to_owned(), user.auth_token.to_owned()));
+    Ok(user.into())
 }
 
 async fn logout(State(app_state): State<Arc<AppState>>, cookies: Cookies) -> StatusCode {
@@ -49,74 +49,57 @@ async fn login_guest(
     State(app_state): State<Arc<AppState>>,
     cookies: Cookies,
     Json(payload): Json<GuestLogin>,
-) -> Response {
-    let maybe_user = app_state.user_guest_session(payload.username);
-    if let JsonMessage::User { auth_token, .. } = &maybe_user {
-        cookies.add(Cookie::new(TOKEN, auth_token.to_owned()))
-    };
-    maybe_user.into_response()
+) -> Result<Json<UserContext>, StateError> {
+    let user = app_state.user_guest_session(payload.username)?;
+    cookies.add(Cookie::new(TOKEN, user.auth_token.to_owned()));
+    Ok(user.into())
 }
 
 async fn create_user(
     State(app_state): State<Arc<AppState>>,
     Json(payload): Json<UserCreate>,
-) -> Response {
-    app_state
-        .user_create_with_session(payload.username, payload.email, payload.password)
-        .into_response()
+) -> Result<Json<UserContext>, StateError> {
+    app_state.user_create_with_session(payload.username, payload.email, payload.password).map(|data|data.into())
 }
 
 async fn auth_context(
     State(app_state): State<Arc<AppState>>,
     cookies: Cookies,
-) -> Json<UserContext> {
-    let maybe_user = app_state.get_session(cookies.get(TOKEN));
-    let mut game = JsonMessage::NotFound;
-    if let JsonMessage::User { email, .. } = &maybe_user {
-        if let Some(active_game) = app_state.quoridor_get_id_by_player(email) {
-            game = JsonMessage::QuoridorID(active_game);
-        }
-    }
-    UserContext {
-        user: maybe_user,
-        active_match: game,
-    }
-    .into()
+) -> Result<Json<UserContext>, StateError> {
+    let mut user = app_state.get_session(cookies.get(TOKEN))?;
+    user.active_match = app_state.quoridor_get_id_by_player(&user.email);
+    Ok(user.into())
 }
 
-async fn quoridor_cpu(cookies: Cookies, State(app_state): State<Arc<AppState>>) -> Response {
-    if let JsonMessage::User { email, .. } = app_state.get_session(cookies.get(TOKEN)) {
-        if let Some(game_id) = app_state.quoridor_new_game(&vec![email]) {
-            JsonMessage::QuoridorID(game_id).into_response()
-        } else {
-            JsonMessage::ServerError.into_response()
-        }
-    } else {
-        JsonMessage::Unauthorized.into_response()
-    }
+async fn quoridor_cpu(
+    cookies: Cookies,
+    State(app_state): State<Arc<AppState>>,
+) -> Result<UserContext, StateError> {
+    let mut user = app_state.get_session(cookies.get(TOKEN))?;
+    user.active_match = app_state.quoridor_new_game(&vec![user.email.to_owned()]);
+    Ok(user)
 }
 
 async fn quoridor_que_join(
     cookies: Cookies,
     Path(host_name): Path<String>,
     State(app_state): State<Arc<AppState>>,
-) -> Response {
-    if let JsonMessage::User { email, .. } = app_state.get_session(cookies.get(TOKEN)) {
-        if let Some(sender) = app_state.quoridor_que.lock().unwrap().remove(&host_name) {
-            if let Some(game_id) = app_state.quoridor_new_game(&vec![host_name, email]) {
-                let game_json = JsonMessage::QuoridorID(game_id.to_owned());
-                if sender.send(game_id).is_ok() {
-                    return game_json.into_response();
-                }
-            }
-            JsonMessage::ServerError
-        } else {
-            JsonMessage::NotFound
+) -> Result<Json<UserContext>, StateError> {
+    let mut user = app_state.get_session(cookies.get(TOKEN))?;
+    let sender = app_state
+        .quoridor_que
+        .lock()
+        .unwrap()
+        .remove(&host_name)
+        .ok_or(StateError::NotFound)?;
+    user.active_match = app_state.quoridor_new_game(&vec![host_name, user.email.to_owned()]);
+    if let Some(game) = &user.active_match {
+        match sender.send(game.to_owned()) {
+            Ok(_) => return Ok(user.into()),
+            Err(_) => app_state.quoridor_drop_by_id(game),
         }
-    } else {
-        JsonMessage::Unauthorized
     }
-    .into_response()
+    Err(StateError::ServerError)
 }
 
 async fn quoridor_que_host(
@@ -124,12 +107,11 @@ async fn quoridor_que_host(
     ws: WebSocketUpgrade,
     State(app_state): State<Arc<AppState>>,
 ) -> Response {
-    let player = if let JsonMessage::User { email, .. } = app_state.get_session(cookies.get(TOKEN))
-    {
-        email
-    } else {
-        return JsonMessage::Unauthorized.into_response();
-    };
+    let ses = app_state.get_session(cookies.get(TOKEN));
+    if ses.is_err() {
+        return ses.into_response();
+    }
+    let player = ses.unwrap().email;
     ws.on_upgrade(|socket| async move {
         let (channel_send, channel_recv) = tokio::sync::oneshot::channel::<String>();
         let (mut sender, mut reciever) = socket.split();
@@ -143,12 +125,7 @@ async fn quoridor_que_host(
 
         let mut send_task = tokio::spawn(async move {
             if let Ok(game_id) = channel_recv.await {
-                if let Ok(payload) = to_string(&JsonMessage::QuoridorID(game_id.to_owned())) {
-                    if sender.send(payload.into()).await.is_ok() {
-                        return;
-                    }
-                }
-                app_state.quoridor_drop_by_id(&game_id)
+                let _ =  sender.send(game_id.into()).await;
             }
         });
 
@@ -171,20 +148,20 @@ async fn quoridor_que_host(
     })
 }
 
-async fn quoridor_que_get(cookies: Cookies, State(app_state): State<Arc<AppState>>) -> Response {
-    if let JsonMessage::User { .. } = app_state.get_session(cookies.get(TOKEN)) {
-        let que: Json<_> = app_state
-            .quoridor_que
-            .lock()
-            .unwrap()
-            .keys()
-            .map(|key| key.to_owned())
-            .collect::<Vec<_>>()
-            .into();
-        que.into_response()
-    } else {
-        JsonMessage::Unauthorized.into_response()
-    }
+async fn quoridor_que_get(
+    cookies: Cookies,
+    State(app_state): State<Arc<AppState>>,
+) -> Result<Json<Vec<String>>, StateError> {
+    app_state.get_session(cookies.get(TOKEN))?;
+    let que: Json<_> = app_state
+        .quoridor_que
+        .lock()
+        .unwrap()
+        .keys()
+        .map(|key| key.to_owned())
+        .collect::<Vec<_>>()
+        .into();
+    Ok(que)
 }
 
 async fn debug_index() -> axum::response::Html<String> {
@@ -194,20 +171,19 @@ async fn debug_index() -> axum::response::Html<String> {
     axum::response::Html(markup)
 }
 
-async fn quoridor_get_matches(cookies: Cookies, State(app_state): State<Arc<AppState>>) {
-    let session = app_state.get_session(cookies.get(TOKEN));
-    if matches!(session, JsonMessage::User { .. }) {
-        let data: Vec<QuoridorMatchMeta> = app_state
-            .quoridor_games
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|(key, (game, _))| (key.to_owned(), game.read().unwrap().clone()).into())
-            .collect();
-        Json::from(data).into_response()
-    } else {
-        session.into_response()
-    };
+async fn quoridor_get_matches(
+    cookies: Cookies,
+    State(app_state): State<Arc<AppState>>,
+) -> Result<Json<Vec<QuoridorMatchMeta>>, StateError> {
+    app_state.get_session(cookies.get(TOKEN))?;
+    let data: Vec<QuoridorMatchMeta> = app_state
+        .quoridor_games
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(key, (game, _))| (key.to_owned(), game.read().unwrap().clone()).into())
+        .collect();
+    Ok(data.into())
 }
 
 async fn join_chat(
@@ -217,16 +193,15 @@ async fn join_chat(
     State(app_state): State<Arc<AppState>>,
 ) -> Response {
     let session = app_state.get_session(cookies.get(TOKEN));
-    let player = if let JsonMessage::User { email, .. } = session {
-        email
-    } else {
+    if session.is_err() {
         return session.into_response();
-    };
+    }
+    let player = session.unwrap().email;
 
     let channel_send = if let Some(channel) = app_state.chat_channel.read().unwrap().get(&id) {
         channel.clone()
     } else {
-        return JsonMessage::NotFound.into_response();
+        return StateError::NotFound.into_response();
     };
 
     ws.on_upgrade(|socket: WebSocket| async move {
@@ -275,12 +250,10 @@ async fn quoridor_game(
     State(app_state): State<Arc<AppState>>,
 ) -> Response {
     let session = app_state.get_session(cookies.get(TOKEN));
-    let player_recv = if let JsonMessage::User { email, .. } = session {
-        email
-    } else {
+    if session.is_err() {
         return session.into_response();
-    };
-
+    }
+    let player_recv = session.unwrap().email;
     ws.on_upgrade(|mut socket: WebSocket| async move {
         let (channel_send, game) = if let Some((game, sender)) = app_state.quoridor_get_full(&id) {
             (sender, game)
