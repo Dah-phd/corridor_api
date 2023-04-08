@@ -1,8 +1,30 @@
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
+use axum::Json;
 use serde::{Deserialize, Serialize};
 
+use crate::errors::StateError;
 use crate::quoridor::QuoridorMatch;
+
+impl IntoResponse for StateError {
+    fn into_response(self) -> axum::response::Response {
+        let mut status_code = None;
+        match self {
+            Self::Unauthorized => {
+                status_code.replace(StatusCode::FORBIDDEN);
+            }
+            Self::NotFound => {
+                status_code.replace(StatusCode::NOT_FOUND);
+            }
+            Self::AlreadyTaken => {}
+            Self::UnsupportedDataType(_) => {}
+            Self::ServerError => {
+                status_code.replace(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        };
+        (status_code.unwrap_or(StatusCode::OK), Json(self)).into_response()
+    }
+}
 
 #[derive(Deserialize)]
 pub struct UserLogin {
@@ -32,7 +54,7 @@ pub struct UserContext {
 
 impl IntoResponse for UserContext {
     fn into_response(self) -> axum::response::Response {
-        (StatusCode::OK, self).into_response()
+        Json(self).into_response()
     }
 }
 

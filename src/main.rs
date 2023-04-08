@@ -30,10 +30,11 @@ async fn login(
     State(app_state): State<Arc<AppState>>,
     cookies: Cookies,
     Json(payload): Json<UserLogin>,
-) -> Result<Json<UserContext>, StateError> {
-    let user = app_state.user_get_with_session(&payload.email, &payload.password)?;
+) -> Result<UserContext, StateError> {
+    let mut user = app_state.user_get_with_session(&payload.email, &payload.password)?;
     cookies.add(Cookie::new(TOKEN.to_owned(), user.auth_token.to_owned()));
-    Ok(user.into())
+    user.active_match = app_state.quoridor_get_id_by_player(&user.email);
+    Ok(user)
 }
 
 async fn logout(State(app_state): State<Arc<AppState>>, cookies: Cookies) -> StatusCode {
@@ -49,26 +50,26 @@ async fn login_guest(
     State(app_state): State<Arc<AppState>>,
     cookies: Cookies,
     Json(payload): Json<GuestLogin>,
-) -> Result<Json<UserContext>, StateError> {
+) -> Result<UserContext, StateError> {
     let user = app_state.user_guest_session(payload.username)?;
     cookies.add(Cookie::new(TOKEN, user.auth_token.to_owned()));
-    Ok(user.into())
+    Ok(user)
 }
 
 async fn create_user(
     State(app_state): State<Arc<AppState>>,
     Json(payload): Json<UserCreate>,
-) -> Result<Json<UserContext>, StateError> {
-    app_state.user_create_with_session(payload.username, payload.email, payload.password).map(|data|data.into())
+) -> Result<UserContext, StateError> {
+    app_state.user_create_with_session(payload.username, payload.email, payload.password)
 }
 
 async fn auth_context(
     State(app_state): State<Arc<AppState>>,
     cookies: Cookies,
-) -> Result<Json<UserContext>, StateError> {
+) -> Result<UserContext, StateError> {
     let mut user = app_state.get_session(cookies.get(TOKEN))?;
     user.active_match = app_state.quoridor_get_id_by_player(&user.email);
-    Ok(user.into())
+    Ok(user)
 }
 
 async fn quoridor_cpu(
@@ -84,7 +85,7 @@ async fn quoridor_que_join(
     cookies: Cookies,
     Path(host_name): Path<String>,
     State(app_state): State<Arc<AppState>>,
-) -> Result<Json<UserContext>, StateError> {
+) -> Result<UserContext, StateError> {
     let mut user = app_state.get_session(cookies.get(TOKEN))?;
     let sender = app_state
         .quoridor_que
@@ -95,7 +96,7 @@ async fn quoridor_que_join(
     user.active_match = app_state.quoridor_new_game(&vec![host_name, user.email.to_owned()]);
     if let Some(game) = &user.active_match {
         match sender.send(game.to_owned()) {
-            Ok(_) => return Ok(user.into()),
+            Ok(_) => return Ok(user),
             Err(_) => app_state.quoridor_drop_by_id(game),
         }
     }

@@ -51,7 +51,7 @@ impl Users {
         token: String,
     ) -> Result<UserContext, StateError> {
         if !self.email_check.is_match(&email) {
-            return Err(StateError::UnableToParse);
+            return Err(StateError::UnsupportedDataType("Not an email!".into()));
         }
         if self
             .db
