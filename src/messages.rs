@@ -85,6 +85,7 @@ pub enum PlayerMoveResult {
 }
 
 #[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct QuoridorMatchMeta {
     id: String,
     up_player: String,
