@@ -285,6 +285,9 @@ async fn quoridor_game(
 
         let mut recv_task = tokio::spawn(async move {
             while let Some(Ok(msg)) = reciever.next().await {
+                if matches!(&msg, Message::Close(_)) {
+                    return;
+                }
                 if let Ok(msg) = msg.into_text() {
                     if let Ok(player_move) = from_str::<PlayerMove>(&msg) {
                         let move_result =
