@@ -45,6 +45,7 @@ pub struct UserCreate {
 }
 
 #[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct UserContext {
     pub email: String,
     pub username: String,
