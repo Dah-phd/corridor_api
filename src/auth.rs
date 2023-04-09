@@ -53,6 +53,9 @@ impl Users {
         if !self.email_check.is_match(&email) {
             return Err(StateError::UnsupportedDataType("Not an email!".into()));
         }
+        if username == "GUEST" {
+            return Err(StateError::UnsupportedDataType("Can not use GUEST as username!".to_owned()));
+        }
         if self
             .db
             .contains_key(&email)
