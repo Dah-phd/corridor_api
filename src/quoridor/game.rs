@@ -22,11 +22,7 @@ impl Quoridor {
         }
     }
 
-    pub fn get_shortest_path(
-        &self,
-        player: (usize, usize),
-        target: usize,
-    ) -> Option<Vec<(usize, usize)>> {
+    pub fn get_shortest_path(&self, player: (usize, usize), target: usize) -> Option<Vec<(usize, usize)>> {
         a_star_traitbased::AStar::run(self, player, (Some(target), None))
     }
 
@@ -110,11 +106,7 @@ impl Quoridor {
         !self.horizontal_walls.contains(&new_wall)
     }
 
-    fn is_move_blocked_by_wall_or_wrong(
-        &self,
-        start_position: (usize, usize),
-        possible_path: (usize, usize),
-    ) -> bool {
+    fn is_move_blocked_by_wall_or_wrong(&self, start_position: (usize, usize), possible_path: (usize, usize)) -> bool {
         if start_position.0 == possible_path.0 {
             let column_move = Self::sort_positions(possible_path.1, start_position.1);
             if column_move.1 - column_move.0 != 1 {
@@ -124,10 +116,7 @@ impl Quoridor {
                 if wall.0 == start_position.0 && wall.1 == column_move.0 {
                     return true;
                 }
-                if start_position.0 != 0
-                    && wall.0 == start_position.0 - 1
-                    && wall.1 == column_move.0
-                {
+                if start_position.0 != 0 && wall.0 == start_position.0 - 1 && wall.1 == column_move.0 {
                     return true;
                 }
             }
@@ -191,11 +180,7 @@ impl a_star_traitbased::PathGenerator for Quoridor {
     fn generate_paths(&self, from_position: (usize, usize)) -> Vec<(usize, usize)> {
         self.build_possible_paths(from_position)
     }
-    fn calculate_heuristic_cost(
-        &self,
-        position: (usize, usize),
-        target: (Option<usize>, Option<usize>),
-    ) -> usize {
+    fn calculate_heuristic_cost(&self, position: (usize, usize), target: (Option<usize>, Option<usize>)) -> usize {
         let target_row = target.0.unwrap();
         if position.0 > target_row {
             return position.0 - target_row;
@@ -204,11 +189,7 @@ impl a_star_traitbased::PathGenerator for Quoridor {
     }
 
     #[allow(unused_variables)]
-    fn calculate_cost(
-        &self,
-        current_position: (usize, usize),
-        next_position: (usize, usize),
-    ) -> usize {
+    fn calculate_cost(&self, current_position: (usize, usize), next_position: (usize, usize)) -> usize {
         1
     }
 }

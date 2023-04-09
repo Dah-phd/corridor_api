@@ -6,8 +6,7 @@ mod state;
 //internals
 use errors::StateError;
 use messages::{
-    ChatMessage, GuestLogin, PlayerMove, PlayerMoveResult, QuoridorMatchMeta, UserContext,
-    UserCreate, UserLogin,
+    ChatMessage, GuestLogin, PlayerMove, PlayerMoveResult, QuoridorMatchMeta, UserContext, UserCreate, UserLogin,
 };
 use state::AppState;
 //std
@@ -63,19 +62,13 @@ async fn create_user(
     app_state.user_create_with_session(payload.username, payload.email, payload.password)
 }
 
-async fn auth_context(
-    State(app_state): State<Arc<AppState>>,
-    cookies: Cookies,
-) -> Result<UserContext, StateError> {
+async fn auth_context(State(app_state): State<Arc<AppState>>, cookies: Cookies) -> Result<UserContext, StateError> {
     let mut user = app_state.get_session(cookies.get(TOKEN))?;
     user.active_match = app_state.quoridor_get_id_by_player(&user.email);
     Ok(user)
 }
 
-async fn quoridor_cpu(
-    cookies: Cookies,
-    State(app_state): State<Arc<AppState>>,
-) -> Result<UserContext, StateError> {
+async fn quoridor_cpu(cookies: Cookies, State(app_state): State<Arc<AppState>>) -> Result<UserContext, StateError> {
     let mut user = app_state.get_session(cookies.get(TOKEN))?;
     user.active_match = app_state.quoridor_new_game(&vec![user.email.to_owned()]);
     Ok(user)
@@ -103,11 +96,7 @@ async fn quoridor_que_join(
     Err(StateError::ServerError)
 }
 
-async fn quoridor_que_host(
-    cookies: Cookies,
-    ws: WebSocketUpgrade,
-    State(app_state): State<Arc<AppState>>,
-) -> Response {
+async fn quoridor_que_host(cookies: Cookies, ws: WebSocketUpgrade, State(app_state): State<Arc<AppState>>) -> Response {
     let ses = app_state.get_session(cookies.get(TOKEN));
     if ses.is_err() {
         return ses.into_response();
@@ -166,9 +155,7 @@ async fn quoridor_que_get(
 }
 
 async fn debug_index() -> axum::response::Html<String> {
-    let markup = tokio::fs::read_to_string("src/test/index.html")
-        .await
-        .unwrap();
+    let markup = tokio::fs::read_to_string("src/test/index.html").await.unwrap();
     axum::response::Html(markup)
 }
 
@@ -229,7 +216,8 @@ async fn join_chat(
                         }
                     }
                 }
-                let _ = channel_send.send(ChatMessage::MessageError(player.to_owned())); // might remove it if unused by frontend
+                let _ = channel_send.send(ChatMessage::MessageError(player.to_owned()));
+                // might remove it if unused by frontend
             }
         });
 
@@ -250,16 +238,14 @@ async fn quoridor_game(
     Path(id): Path<String>,
     State(app_state): State<Arc<AppState>>,
 ) -> Response {
-    let session = app_state.get_session(cookies.get(TOKEN));
-    if session.is_err() {
-        return session.into_response();
-    }
-    let player_recv = session.unwrap().email;
+    let player_recv = match app_state.get_session(cookies.get(TOKEN)) {
+        Ok(user_context) => user_context.email,
+        Err(err) => return err.into_response(),
+    };
     ws.on_upgrade(|mut socket: WebSocket| async move {
-        let (channel_send, game) = if let Some((game, sender)) = app_state.quoridor_get_full(&id) {
-            (sender, game)
-        } else {
-            return; // also checks if the game exist!
+        let (game, channel_send) = match app_state.quoridor_get_full(&id) {
+            Some(payload) => payload,
+            None => return,
         };
 
         let game_snapshot = to_string(&game.read().unwrap().clone());
@@ -290,8 +276,7 @@ async fn quoridor_game(
                 }
                 if let Ok(msg) = msg.into_text() {
                     if let Ok(player_move) = from_str::<PlayerMove>(&msg) {
-                        let move_result =
-                            game.write().unwrap().make_move(player_move, &player_recv);
+                        let move_result = game.write().unwrap().make_move(player_move, &player_recv);
                         let _ = channel_send.send(move_result);
                     }
                 }

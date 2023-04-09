@@ -15,10 +15,7 @@ const TOKEN_LEN: usize = 16;
 const SECONDS_IN_DAY: i64 = 24 * 60 * 60;
 
 type TimeStamp = i64;
-type QuoridorPackage = (
-    Arc<RwLock<QuoridorMatch>>,
-    broadcast::Sender<PlayerMoveResult>,
-);
+type QuoridorPackage = (Arc<RwLock<QuoridorMatch>>, broadcast::Sender<PlayerMoveResult>);
 type QuoridorQue = Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<String>>>>;
 
 #[derive(Default)]
@@ -46,30 +43,22 @@ impl AppState {
         while sessions.contains_key(&token) {
             token = generate_id(TOKEN_LEN)
         }
-        let user =
-            self.users
-                .lock()
-                .unwrap()
-                .new_user(username, email, password, token.to_owned())?;
+        let user = self
+            .users
+            .lock()
+            .unwrap()
+            .new_user(username, email, password, token.to_owned())?;
         sessions.insert(token, (user.clone(), chrono::Utc::now().timestamp()));
         Ok(user)
     }
 
-    pub fn user_get_with_session(
-        &self,
-        email: &str,
-        password: &str,
-    ) -> Result<UserContext, StateError> {
+    pub fn user_get_with_session(&self, email: &str, password: &str) -> Result<UserContext, StateError> {
         let mut token = generate_id(TOKEN_LEN);
         let mut sessions = self.sessions.lock().unwrap();
         while sessions.contains_key(&token) {
             token = generate_id(TOKEN_LEN)
         }
-        let user = self
-            .users
-            .lock()
-            .unwrap()
-            .get(email, password, token.to_owned())?;
+        let user = self.users.lock().unwrap().get(email, password, token.to_owned())?;
         sessions.insert(token, (user.clone(), chrono::Utc::now().timestamp()));
         Ok(user)
     }
@@ -82,21 +71,14 @@ impl AppState {
     }
 
     pub fn user_guest_session(&self, username: String) -> Result<UserContext, StateError> {
-        if Regex::new(
-            r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
-        )
-        .unwrap()
-        .is_match(&username)
+        if Regex::new(r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})")
+            .unwrap()
+            .is_match(&username)
         {
-            return Err(StateError::UnsupportedDataType(
-                "Should not be email!".to_owned(),
-            ));
+            return Err(StateError::UnsupportedDataType("Should not be email!".to_owned()));
         }
         let mut sessions = self.sessions.lock().unwrap();
-        if sessions
-            .iter()
-            .any(|(_, (user, ..))| user.email == username)
-        {
+        if sessions.iter().any(|(_, (user, ..))| user.email == username) {
             return Err(StateError::AlreadyTaken);
         }
         let mut token = generate_id(TOKEN_LEN);
@@ -111,10 +93,7 @@ impl AppState {
         };
         sessions.insert(
             token,
-            (
-                user.clone(),
-                chrono::Utc::now().timestamp() - SECONDS_IN_DAY * 6,
-            ),
+            (user.clone(), chrono::Utc::now().timestamp() - SECONDS_IN_DAY * 6),
         );
         Ok(user)
     }

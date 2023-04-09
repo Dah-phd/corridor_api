@@ -21,19 +21,16 @@ impl Default for Users {
     fn default() -> Self {
         Self {
             db: sled::open("users").expect("Unable to start DB!"),
-            email_check:Regex::new(r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})")
+            email_check: Regex::new(
+                r"^([a-z0-9_+]([a-z0-9_+.]*[a-z0-9_+])?)@([a-z0-9]+([\-\.]{1}[a-z0-9]+)*\.[a-z]{2,6})",
+            )
             .expect("Regex creation should not fail!"),
         }
     }
 }
 
 impl Users {
-    pub fn get(
-        &self,
-        email: &str,
-        password: &str,
-        token: String,
-    ) -> Result<UserContext, StateError> {
+    pub fn get(&self, email: &str, password: &str, token: String) -> Result<UserContext, StateError> {
         let user_data = self.is_authenticated(email, password)?;
         Ok(UserContext {
             email: email.to_owned(),
@@ -54,13 +51,11 @@ impl Users {
             return Err(StateError::UnsupportedDataType("Not an email!".into()));
         }
         if username == "GUEST" {
-            return Err(StateError::UnsupportedDataType("Can not use GUEST as username!".to_owned()));
+            return Err(StateError::UnsupportedDataType(
+                "Can not use GUEST as username!".to_owned(),
+            ));
         }
-        if self
-            .db
-            .contains_key(&email)
-            .map_err(|_| StateError::ServerError)?
-        {
+        if self.db.contains_key(&email).map_err(|_| StateError::ServerError)? {
             return Err(StateError::AlreadyTaken);
         }
         let user_payload = UserData {

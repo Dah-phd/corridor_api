@@ -73,11 +73,7 @@ impl CpuPlayer {
         self.player_path.len() == 2
     }
 
-    fn get_difference_between_total_positions(
-        &self,
-        position_x: (usize, usize),
-        position_y: (usize, usize),
-    ) -> usize {
+    fn get_difference_between_total_positions(&self, position_x: (usize, usize), position_y: (usize, usize)) -> usize {
         let x = position_x.0 + position_x.1;
         let y = position_y.0 + position_y.1;
         if x > y {
@@ -131,33 +127,19 @@ impl CpuPlayer {
         }
     }
 
-    fn add_new_hwall_path_result(
-        &mut self,
-        position: (usize, usize),
-        storage: &mut Vec<(usize, (usize, usize))>,
-    ) {
+    fn add_new_hwall_path_result(&mut self, position: (usize, usize), storage: &mut Vec<(usize, (usize, usize))>) {
         if self.game.new_h_wall(position) {
             storage.push((
-                self.game
-                    .get_shortest_path(self.game.up_player, 8)
-                    .unwrap()
-                    .len(),
+                self.game.get_shortest_path(self.game.up_player, 8).unwrap().len(),
                 position,
             ));
             self.game.horizontal_walls.pop();
         }
     }
-    fn add_new_vwall_path_result(
-        &mut self,
-        position: (usize, usize),
-        storage: &mut Vec<(usize, (usize, usize))>,
-    ) {
+    fn add_new_vwall_path_result(&mut self, position: (usize, usize), storage: &mut Vec<(usize, (usize, usize))>) {
         if self.game.new_v_wall(position) {
             storage.push((
-                self.game
-                    .get_shortest_path(self.game.up_player, 8)
-                    .unwrap()
-                    .len(),
+                self.game.get_shortest_path(self.game.up_player, 8).unwrap().len(),
                 position,
             ));
             self.game.vertical_walls.pop();
