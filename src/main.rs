@@ -6,8 +6,8 @@ mod state;
 //internals
 use errors::StateError;
 use messages::{
-    ChatMessage, GuestLogin, PlayerMove, PlayerMoveResult, QuoridorMatchMeta,
-    UserContext, UserCreate, UserLogin,
+    ChatMessage, GuestLogin, PlayerMove, PlayerMoveResult, QuoridorMatchMeta, UserContext,
+    UserCreate, UserLogin,
 };
 use state::AppState;
 //std
@@ -126,7 +126,7 @@ async fn quoridor_que_host(
 
         let mut send_task = tokio::spawn(async move {
             if let Ok(game_id) = channel_recv.await {
-                let _ =  sender.send(game_id.into()).await;
+                let _ = sender.send(game_id.into()).await;
             }
         });
 
