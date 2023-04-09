@@ -97,11 +97,11 @@ async fn quoridor_que_join(
 }
 
 async fn quoridor_que_host(cookies: Cookies, ws: WebSocketUpgrade, State(app_state): State<Arc<AppState>>) -> Response {
-    let ses = app_state.get_session(cookies.get(TOKEN));
-    if ses.is_err() {
-        return ses.into_response();
-    }
-    let player = ses.unwrap().email;
+    let player = match app_state.get_session(cookies.get(TOKEN)) {
+        Ok(player) => player.email,
+        Err(error) => return error.into_response(),
+    };
+
     ws.on_upgrade(|socket| async move {
         let (channel_send, channel_recv) = tokio::sync::oneshot::channel::<String>();
         let (mut sender, mut reciever) = socket.split();

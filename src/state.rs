@@ -110,6 +110,13 @@ impl AppState {
             })
     }
 
+    fn create_chat_from_id(&self, chat_id: &str) {
+        self.chat_channel
+            .write()
+            .unwrap()
+            .insert(chat_id.into(), broadcast::channel::<ChatMessage>(50).0);
+    }
+
     pub fn quoridor_new_game(&self, lobby: &Vec<String>) -> Option<String> {
         if lobby.is_empty() {
             return None;
@@ -123,10 +130,7 @@ impl AppState {
         }
         games.insert(id.to_owned(), (new_game, channel));
         drop(games);
-        self.chat_channel
-            .write()
-            .unwrap()
-            .insert(id.to_owned(), broadcast::channel::<ChatMessage>(50).0);
+        self.create_chat_from_id(&id);
         Some(id)
     }
 
