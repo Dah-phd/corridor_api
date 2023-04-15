@@ -1,4 +1,4 @@
-import { For, createSignal } from "solid-js"
+import { Accessor, For, createSignal } from "solid-js"
 import {
     QuoridorSession,
     makeQuoridorMove,
@@ -13,8 +13,7 @@ import {
 } from "./functions/game_quoridor"
 
 import { showMessages } from "./Chat";
-import { userContext } from "./functions/auth";
-import { getQuoridorWS } from "./AppViews";
+import { UserContext } from "./functions/auth";
 
 const ARRAY_OF_IDS = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 
@@ -65,12 +64,12 @@ function removeHoverWallBorders(row: number, col: number) {
     }
 }
 
-function Tile(props: { row: number, column: number, session: QuoridorSession, ws: WebSocket }) {
+function Tile(props: { row: number, column: number, session: QuoridorSession, ws: WebSocket, user: UserContext }) {
     return (
         <div
             class={setTileClass(props.row, props.column, props.session)}
             id={`${props.row}${props.column}`}
-            onClick={() => makeQuoridorMove(props.row, props.column, props.session, props.ws, moveDispatch[moveCallbackName()])}
+            onClick={() => makeQuoridorMove(props.row, props.column, props.session, props.ws, props.user, moveDispatch[moveCallbackName()])}
             onMouseEnter={() => {
                 if (moveCallbackName() === "move") return;
                 dispatchHoverWallBorders(props.row, props.column, props.session);
@@ -84,7 +83,7 @@ function Tile(props: { row: number, column: number, session: QuoridorSession, ws
     )
 }
 
-function Row(props: { row: number, session: QuoridorSession, ws: WebSocket }) {
+function Row(props: { row: number, session: QuoridorSession, user:UserContext, ws: WebSocket }) {
     return (
         <div class="row">
             <For each={ARRAY_OF_IDS}>
@@ -94,31 +93,23 @@ function Row(props: { row: number, session: QuoridorSession, ws: WebSocket }) {
     )
 }
 
-export function QuoridorBoard() {
-    let maybe_game = getQuoridorWS();
-
-    if (maybe_game === null) return;
-
-    let [ws, maybe_session] = maybe_game;
-
-    let session = maybe_session();
-
-    if (session === null) return;
+export function QuoridorBoard(props: {ws:WebSocket, session: QuoridorSession | null, user:UserContext}) {
+    if (!props.session) return;
 
     function currentRed(player: string) {
-        return session?.current == player ? "color:red" : ""
+        return props.session?.current == player ? "color:red" : ""
     }
 
     return (
         <div class="full_screen_centered" style={showMessages() ? "display:none;" : ""}>
             <div class="quoridor">
-                <h1 style={currentRed(session.up_player)}>{session.up_player} ({session.game.up_player_free_walls})</h1>
-                <div style={session.current == userContext()?.email ? "border: solid 10px red;" : 'border: solid 10px white;'} >
+                <h1 style={currentRed(props.session.up_player)}>{props.session.up_player} ({props.session.game.up_player_free_walls})</h1>
+                <div style={props.session.current == props.user.email ? "border: solid 10px red;" : 'border: solid 10px white;'} >
                     <For each={ARRAY_OF_IDS}>
-                        {(i) => { return <Row row={i} session={session as QuoridorSession} ws={ws} /> }}
+                        {(i) => { return <Row row={i} session={props.session as QuoridorSession} ws={props.ws} user={props.user} /> }}
                     </For>
                 </div>
-                <h1 style={currentRed(session.down_player)}>{session.down_player} ({session.game.down_player_free_walls})</h1>
+                <h1 style={currentRed(props.session.down_player)}>{props.session.down_player} ({props.session.game.down_player_free_walls})</h1>
                 <div class="box">
                     <button
                         class="std_btn"

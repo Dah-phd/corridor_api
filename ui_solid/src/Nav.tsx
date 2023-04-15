@@ -1,4 +1,5 @@
-import { userContext, logout } from "./functions/auth";
+import { Accessor, Setter } from "solid-js";
+import { UserContext, logout } from "./functions/auth";
 import { profileSwitch } from "./Profile";
 
 type btn = {
@@ -22,8 +23,12 @@ function ButtonBase(props: btn) {
     )
 }
 
-export function Nav(props: { left?: btn, right?: btn, showLogo?: boolean }) {
-    const username = userContext();
+export function Nav(props: { 
+    left?: btn, 
+    right?: btn, 
+    showLogo?: boolean, 
+    context:[Accessor<UserContext|null>, Setter<UserContext|null>] }) {
+    const username = props.context[0]();
     return (
         <nav>
             <div class="nav_block">
@@ -32,7 +37,7 @@ export function Nav(props: { left?: btn, right?: btn, showLogo?: boolean }) {
             </div>
             <div class="image_nav"></div>
             <div class="nav_block">
-                <div class="box">{!username ? <></> : <ButtonBase text="Logout" click={logout} />}</div>
+                <div class="box">{!username ? <></> : <ButtonBase text="Logout" click={() => logout(props.context[1])} />}</div>
                 <div class="box">{!props.right ? <></> : <ButtonBase {...props.right} />}</div>
             </div>
         </nav>

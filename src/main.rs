@@ -243,7 +243,6 @@ async fn quoridor_game(
             Some(payload) => payload,
             None => return,
         };
-
         let game_snapshot = to_string(&game.read().unwrap().clone());
         if let Ok(msg) = game_snapshot {
             let _ = socket.send(msg.into()).await;
@@ -292,9 +291,9 @@ async fn quoridor_game(
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    // tracing_subscriber::registry()
+    //     .with(tracing_subscriber::fmt::layer())
+    //     .init();
 
     let state = AppState::new_as_arc();
     let state_for_thread = state.clone();

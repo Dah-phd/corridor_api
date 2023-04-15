@@ -1,6 +1,6 @@
 import { createSignal, onMount, onCleanup } from "solid-js"
-import { userContext } from "./functions/auth"
 import { showMessage, message } from "./Message";
+import { UserContext } from "./functions/auth";
 
 export const [showProfile, profileSwitch] = createSignal(false);
 const [isLoading, setterLoading] = createSignal(false);
@@ -18,8 +18,8 @@ function updPassClick(pass1: HTMLInputElement, pass2: HTMLInputElement) {
     [pass1, pass2].forEach(el => el.value = "")
 }
 
-export function Profile() {
-    if (userContext()?.email == "GUEST") {
+export function Profile(props:{user:UserContext}) {
+    if (props.user.email == "GUEST") {
         showMessage("User profile does not exist!\nPlease login and try again!");
         return
     }
@@ -33,7 +33,7 @@ export function Profile() {
     return (
         <>
             <div class="systen_msg" style={message() ? "z-index: 0 !important;" : ""}>
-                <p style="color:gray;">Username: <i style="color:red;">{userContext()?.username}</i></p>
+                <p style="color:gray;">Username: <i style="color:red;">{props.user.username}</i></p>
                 <hr />
                 <input type="email" ref={email} placeholder={"TODO!"} />
                 <p>

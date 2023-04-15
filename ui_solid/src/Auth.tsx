@@ -1,12 +1,24 @@
-import { login, registerUser, registerGuest } from "./functions/auth";
+import { Setter } from "solid-js";
+import { login, registerUser, registerGuest, UserContext } from "./functions/auth";
+import { QuoridorSession } from "./functions/game_quoridor";
 import { startTransition, finishTransition } from "./Transition";
 
 
-export function UserSignIn() {
+export function UserSignIn(props: {
+    contextSetter: Setter<UserContext | null>,
+    setWS: Setter<WebSocket | null>,
+    setSession: Setter<QuoridorSession | null>,
+}) {
     let username: any, password: any;
     function loginClick() {
         startTransition(true);
-        login(username.value, password.value, finishTransition);
+        login(
+            username.value, password.value,
+            props.contextSetter,
+            props.setWS,
+            props.setSession,
+            finishTransition
+        );
         password.value = null
     }
     return (
@@ -21,11 +33,15 @@ export function UserSignIn() {
     )
 }
 
-export function GuestSignIn() {
+export function GuestSignIn( props:{
+    contextSetter: Setter<UserContext | null>,
+    setWS: Setter<WebSocket | null>,
+    setSession: Setter<QuoridorSession | null>,
+}) {
     let username: any;
     function newGuestClick() {
         startTransition(true);
-        registerGuest(username.value, finishTransition);
+        registerGuest(username.value, props.contextSetter, props.setWS, props.setSession, finishTransition);
         username.value = null
     }
     return (
@@ -39,12 +55,20 @@ export function GuestSignIn() {
     )
 }
 
-export function UserCreation() {
+export function UserCreation(props: {
+        contextSetter: Setter<UserContext | null>,
+        setWS: Setter<WebSocket | null>,
+        setSession: Setter<QuoridorSession | null>,
+}) {
     let username: any, password: any, password2: any, email: any;
     function newUserClick() {
         if (password.value != password2.value) return alert('Passwords do not match!');
         startTransition(true);
-        registerUser(username.value, password.value, email.value, finishTransition);
+        registerUser(
+            username.value, password.value, email.value,
+            props.contextSetter, props.setWS, props.setSession,
+            finishTransition
+        );
         [username, password, password2, email].forEach((el) => el.value = null);
     }
     return (

@@ -1,8 +1,9 @@
-import { createSignal } from "solid-js";
+import { Setter, createSignal } from "solid-js";
 import { showMessage } from "../Message";
 import { LOGIN_URL, LOGOUT, REGISTER_URL, USER_CONTEXT, getCookie, setCookie } from "./utils"
 import { joinQuoriodrGame } from "./lobbies";
 import { finishTransition, startTransition } from "../Transition";
+import { QuoridorSession } from "./game_quoridor";
 
 export interface UserContext {
     email: string,
@@ -15,61 +16,93 @@ type UserResult = UserContext
     | "AlreadyTaken"
     | { UnsupportedDataType: string };
 
-export const [userContext, contextSetter] = createSignal<UserContext | null>();
-
-export function getContext() {
+export function getContext(
+    contextSetter: Setter<UserContext | null>,
+    setWS: Setter<WebSocket | null>,
+    setSession: Setter<QuoridorSession | null>,
+) {
     if (!getCookie()) { contextSetter(null); return; }
-    fetch(USER_CONTEXT).then(handleAuthResponse).catch(console.log)
+    fetch(USER_CONTEXT)
+    .then(data => handleAuthResponse(data, contextSetter, setWS, setSession))
+    .catch(console.log)
 }
 
-export function login(email: string, password: string, after?: () => void) {
-    fetch(LOGIN_URL, { 
+export function login(
+    email: string, password: string, 
+    contextSetter: Setter<UserContext | null>,
+    setWS: Setter<WebSocket | null>,
+    setSession: Setter<QuoridorSession | null>,
+    after?: () => void
+) {
+    fetch(LOGIN_URL, {
         method: 'post',
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email, password: password }) 
+        body: JSON.stringify({ email: email, password: password })
     })
-        .then(handleAuthResponse)
+        .then(data => handleAuthResponse(data, contextSetter, setWS, setSession))
         .catch(console.log)
-        .finally(() => { setTokenIfNotExists(); if (after) after() })
+        .finally(() => { if (after) after() })
 }
 
-export function logout() {
+export function logout(contextSetter: Setter<UserContext | null>) {
     fetch(LOGOUT).then(_ => contextSetter(null)).catch(console.log);
 }
 
-export function registerUser(username: string, password: string, email: string, after?: () => void) {
+export function registerUser(
+    username: string, password: string, email: string, 
+    contextSetter: Setter<UserContext | null>,
+    setWS: Setter<WebSocket | null>,
+    setSession: Setter<QuoridorSession | null>,
+    after?: () => void
+) {
     if (password.length > 72) { showMessage("Password too long!"); return }
     fetch(REGISTER_URL, {
         method: 'post',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: username, password: password, email: email })
     })
-        .then(handleAuthResponse)
+        .then(data => handleAuthResponse(data, contextSetter, setWS, setSession))
         .catch(console.log)
-        .finally(() => { setTokenIfNotExists(); if (after) after() })
+        .finally(() => { if (after) after() })
 }
 
-export function registerGuest(username: string, after?: () => void) {
-    fetch(LOGIN_URL, { 
-        method: 'post', 
+export function registerGuest(
+    username: string,
+    contextSetter: Setter<UserContext | null>,
+    setWS: Setter<WebSocket | null>,
+    setSession: Setter<QuoridorSession | null>,
+    after?: () => void
+) {
+    fetch(LOGIN_URL, {
+        method: 'post',
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username }) 
+        body: JSON.stringify({ username: username })
     })
-        .then(handleAuthResponse)
+        .then(data => handleAuthResponse(data, contextSetter, setWS, setSession))
         .catch(console.log)
-        .finally(() => { setTokenIfNotExists(); if (after) after() })
+        .finally(() => { if (after) after() })
 }
 
-function handleAuthResponse(response: Response) {
+function handleAuthResponse(
+    response: Response,
+    contextSetter: Setter<UserContext | null>,
+    setWS: Setter<WebSocket | null>,
+    setSession: Setter<QuoridorSession | null>
+) {
     if (!response.ok) {
         if (response.status >= 500) { showMessage("Server error please try agian in few minutes!"); return }
         if (response.status == 404) { showMessage("User not found! Check your login!"); return }
         if (response.status == 403) { showMessage("Incorrect credentials!"); return }
     }
-    response.json().then(handleAuthResult)
+    response.json().then(user => handleAuthResult(user, contextSetter, setWS, setSession))
 }
 
-function handleAuthResult(data: UserResult) {
+function handleAuthResult(
+    data: UserResult,
+    contextSetter: Setter<UserContext | null>,
+    setWS: Setter<WebSocket | null>,
+    setSession: Setter<QuoridorSession | null>
+) {
     console.log(data);
     if (data === "AlreadyTaken") { showMessage("This username is already in use!"); return }
     if ("UnsupportedDataType" in data) { showMessage(data.UnsupportedDataType); return }
@@ -77,21 +110,9 @@ function handleAuthResult(data: UserResult) {
     setCookie(data.authToken);
     if (data.activeMatch) {
         startTransition();
-        setTokenIfNotExists(data.authToken);
-        joinQuoriodrGame(data.activeMatch, finishTransition);
+        setCookie(data.authToken);
+        joinQuoriodrGame(data.activeMatch, data, setWS, setSession, finishTransition);
     }
-}
-
-function setTokenIfNotExists(passed_token?: string) {
-    console.log(userContext());
-    if (passed_token) {
-        setCookie(passed_token);
-        return;
-    }
-    if (getCookie()) return;
-    const token = userContext()?.authToken;
-    console.log(token);
-    if (token) setCookie(token);
 }
 
 // export function updatePassword(password: string, after?: () => void) {

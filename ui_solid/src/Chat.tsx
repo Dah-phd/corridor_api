@@ -1,6 +1,5 @@
 import { createEffect, createSignal, For } from "solid-js";
 import { Message, sendMsg, updateScroll } from "./functions/chat";
-import { userContext } from "./functions/auth";
 
 export const [unreadMessages, setUnreadMessages] = createSignal(0);
 
@@ -49,7 +48,7 @@ export function MessageBoard() {
 }
 
 function MessageText(props: { msg_sender: string, msg: string }) {
-    if (userContext()?.email == props.msg_sender) return <div class="msg_own_wrapper"><div class="msg_own">{props.msg}</div></div>
+    if (false) return <div class="msg_own_wrapper"><div class="msg_own">{props.msg}</div></div>
 
     if (lastSender() == props.msg_sender) return <div class="msg">{props.msg}</div>
 

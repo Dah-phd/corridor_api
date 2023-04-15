@@ -1,5 +1,4 @@
-import { getQuoridorWS } from "../AppViews";
-import { userContext } from "./auth";
+import { UserContext } from "./auth";
 
 export interface QuoridorGame {
     up_player: [number, number],
@@ -31,15 +30,12 @@ interface PlayerMove {
 
 type MoveFunc = (row: number, col: number) => PlayerMove
 
-export function concede() {
-    let ws = getQuoridorWS();
-    if (ws === null) return;
-    if (ws[0].readyState !== WebSocket.OPEN) return;
-    ws[0].send("Concede")
+export function concede(ws: WebSocket) {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    ws.send("Concede")
 }
 
-export function makeQuoridorMove(row: number, col: number, game: QuoridorSession, ws: WebSocket, callback: MoveFunc) {
-    const user = userContext();
+export function makeQuoridorMove(row: number, col: number, game: QuoridorSession, ws: WebSocket, user:UserContext, callback: MoveFunc) {
     if (ws.readyState !== WebSocket.OPEN) return;
     if (!user || game.current != user.email) return;
     ws.send(JSON.stringify(callback(row, col)));
