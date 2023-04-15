@@ -21,4 +21,5 @@ bcrypt = "0.14.0"
 magic-crypt = "3.1.12"
 futures = "0.3"
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+tower-http = { version = "0.4.0", features = ["fs"]}
 tracing-subscriber = "0.3.16"

@@ -21,6 +21,7 @@ use axum::{Json, Router};
 use futures::{sink::SinkExt, stream::StreamExt};
 use serde_json::{from_str, to_string};
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
+use tower_http::services::ServeDir;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 const TOKEN: &str = "auth_token";
@@ -152,11 +153,6 @@ async fn quoridor_que_get(
         .collect::<Vec<_>>()
         .into();
     Ok(que)
-}
-
-async fn debug_index() -> axum::response::Html<String> {
-    let markup = tokio::fs::read_to_string("src/test/index.html").await.unwrap();
-    axum::response::Html(markup)
 }
 
 async fn quoridor_get_matches(
@@ -311,7 +307,7 @@ async fn main() {
     });
 
     let app = Router::new()
-        .route("/", get(debug_index))
+        .nest_service("/", ServeDir::new("static/build"))
         .route("/auth/login", post(login))
         .route("/auth/guest_login", post(login_guest))
         .route("/auth/context", get(auth_context))
