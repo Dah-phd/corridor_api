@@ -25,7 +25,6 @@ function joinGame(context: UserContext, setWS: Setter<WebSocket>, setSession: Se
 }
 
 export function hostQuoriodrCPU(
-    context: UserContext,
     setWS: Setter<WebSocket>,
     setSession: Setter<QuoridorSession | null>,
     after?: () => void
@@ -36,7 +35,7 @@ export function hostQuoriodrCPU(
                 alert("Unable to create solo game!");
                 return;
             }
-            status.json().then(msg => joinGame(context, setWS, setSession))
+            status.json().then(msg => joinGame(msg, setWS, setSession))
         })
         .catch((err) => { alert(err) })
         .finally(() => { if (after) after() })
@@ -45,7 +44,6 @@ export function hostQuoriodrCPU(
 
 export function joinQuoriodrGame(
     id: string,
-    context: UserContext,
     setWS: Setter<WebSocket>,
     setSession: Setter<QuoridorSession | null>,
     after?: () => void
@@ -56,7 +54,7 @@ export function joinQuoriodrGame(
                 alert("Unable to join game!");
                 return
             }
-            status.json().then(data => joinGame(context, setWS, setSession))
+            status.json().then(msg => joinGame(msg, setWS, setSession))
         })
         .catch(alert)
         .finally(() => { if (after) after() })
@@ -78,6 +76,10 @@ export function hostQuoriodrGame(
     );
 }
 
-export function getLobbies(setter: (lobbies: Array<string>) => void) {
-
+export function getLobbies(setter: Setter<Array<string>>) {
+    fetch(QUORIDOR_QUE).then(
+        resp => {
+            if (resp.ok) { resp.json().then(setter) }
+            else showMessage("Unable to retrive QUE!")
+        })
 }

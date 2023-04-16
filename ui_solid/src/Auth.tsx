@@ -25,7 +25,7 @@ export function UserSignIn(props: {
         <div style="flex-basis: 50%;" onKeyPress={(e) => { if (e.key == 'Enter') loginClick() }}>
             <h1>Sign In:</h1>
             <div >
-                <input type="text" ref={username} placeholder="Username" />
+                <input type="text" ref={username} placeholder="Email" />
                 <input type="password" ref={password} placeholder="Password" />
                 <button class="std_btn" onClick={loginClick}>Login</button>
             </div>

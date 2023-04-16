@@ -1,7 +1,9 @@
 import { Nav } from "./Nav";
 import { Footer } from "./Footer";
-import { createSignal, Switch, Match, onMount, onCleanup, Accessor, Setter, } from "solid-js";
+import { createSignal, Switch, Match, onMount, onCleanup, Accessor, Setter, createEffect, } from "solid-js";
 import { finishTransition, startTransition } from "./Transition";
+import { UserContext } from "./functions/auth";
+import { hostQuoriodrCPU, hostQuoriodrGame } from "./functions/lobbies";
 
 // LOGIN VIEW
 
@@ -75,11 +77,11 @@ export function LobbiesView(props: {
             <Match when={!showSpinner()}>
                 <Nav
                     context={props.context}
-                    left={{ text: "Game VS CPU", click: () => { hostQuoriodrCPU(user, props.setWS, props.setSession, finishTransition); startTransition() } }}
+                    left={{ text: "Game VS CPU", click: () => { hostQuoriodrCPU(props.setWS, props.setSession, finishTransition); startTransition() } }}
                     right={{ text: "Create Lobby", click: () => { hostQuoriodrGame(props.setWS, props.setSession, finishTransition); startTransition() } }}
                 />
                 <div class="full_screen_centered">
-                    <Lobbies />
+                    <Lobbies setWS={props.setWS} setSession={props.setSession} />
                 </div>
                 <Footer />
             </Match>
@@ -100,11 +102,22 @@ export function GameView(props: {
     session: QuoridorSession | null
 }) {
     if (!props.ws) return;
+    let right_btn, right_fn
+    if (props.session?.winner) {
+        alert(`Winner is ${props.session.winner}`);
+        right_btn = "Back to Lobbies";
+        right_fn = () => props.ws?.close();
+    } else {
+        right_btn = "Concede";
+        right_fn = () => concede(props.ws as WebSocket);
+    }
+
+
     return (
         <>
             <Nav
                 context={props.context}
-                right={{ text: 'Concede', style: 'color:red;', click: () => { concede(props.ws as WebSocket) } }}
+                right={{ text: right_btn , style: 'color:red;', click: right_fn }}
                 left={{
                     text: !showMessages() ? `Open Chat ${unreadMessages() ? unreadMessages() : ""}` : "Back to Game",
                     style: unreadMessages() ? "color: red;" : "",
@@ -115,37 +128,6 @@ export function GameView(props: {
             <div class="full_screen_centered">
                 <MessageBoard />
             </div>
-        </>
-    )
-}
-
-
-// FINISHED GAME VIEW
-
-import { FinishedQuoridor } from "./QuoridorEnd";
-import { hostQuoriodrCPU, hostQuoriodrGame } from "./functions/lobbies";
-import { UserContext } from "./functions/auth";
-export const [finishedGame, setFinishedGame] = createSignal<null | QuoridorSession>(null);
-
-function FinishedGameSelector(props: { session: QuoridorSession | null }) {
-    if (!props.session) return
-    return (
-        props.session ? <FinishedQuoridor session={props.session} /> : <></>
-    )
-}
-
-export function FinishedGameView(props: {
-    context: [Accessor<UserContext | null>, Setter<UserContext | null>]
-}) {
-    const backToLobbies = () => { setFinishedGame(null) };
-    function backToLobbiesListener(ev: KeyboardEvent) { if (ev.key === "Escape") { backToLobbies() } }
-    onMount(() => { document.addEventListener('keydown', backToLobbiesListener) });
-    onCleanup(() => { document.removeEventListener('keydown', backToLobbiesListener) });
-    return (
-        <>
-            <Nav {...props} right={{ text: "Back to Lobbies", click: backToLobbies }} />
-            <FinishedGameSelector session={finishedGame()} />
-            <div class="std_btn" onClick={backToLobbies}> Go to Lobbies </div>
         </>
     )
 }

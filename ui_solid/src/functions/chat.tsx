@@ -6,9 +6,9 @@ import { CHAT_CHANNEL } from "./utils";
 export const ACTIVE_CHAT = "activeChat";
 
 export interface Message {
-    id: ChatID,
-    msg: string,
-    player: string
+    user: string,
+    message: string,
+    timestamp: number,
 }
 
 export interface ChatID {

@@ -36,8 +36,8 @@ export function MessageBoard() {
             <div class="chat_box" ref={scrollableEl}>
                 <For each={pushMessage(newMsg())}>
                     {(msg: Message) => {
-                        const Component = <MessageText msg_sender={msg.player} msg={msg.msg} />
-                        setLastSender(msg.player)
+                        const Component = <MessageText msg_sender={msg.user} msg={msg.message} />
+                        setLastSender(msg.user)
                         return Component
                     }}
                 </For>

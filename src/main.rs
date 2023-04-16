@@ -291,9 +291,9 @@ async fn quoridor_game(
 
 #[tokio::main]
 async fn main() {
-    // tracing_subscriber::registry()
-    //     .with(tracing_subscriber::fmt::layer())
-    //     .init();
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 
     let state = AppState::new_as_arc();
     let state_for_thread = state.clone();

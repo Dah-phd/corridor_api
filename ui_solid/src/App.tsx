@@ -1,4 +1,4 @@
-import { LoginView, LobbiesView, GameView, FinishedGameView, finishedGame } from "./AppViews";
+import { LoginView, LobbiesView, GameView } from "./AppViews";
 import { LoadAnimation } from "./LoadAnimation";
 import { getContext, UserContext } from './functions/auth';
 import { Switch, Match, createSignal, Accessor } from "solid-js";
@@ -22,9 +22,6 @@ function App() {
   return (
     <>
       <Switch>
-        <Match when={finishedGame()}>
-          <FinishedGameView context={[userContext, contextSetter]} />
-        </Match>
         <Match when={!inTransition && !isLoading}>
           <Transition />
         </Match>

@@ -111,7 +111,7 @@ function handleAuthResult(
     if (data.activeMatch) {
         startTransition();
         setCookie(data.authToken);
-        joinQuoriodrGame(data.activeMatch, data, setWS, setSession, finishTransition);
+        joinQuoriodrGame(data.activeMatch, setWS, setSession, finishTransition);
     }
 }
 
