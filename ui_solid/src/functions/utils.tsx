@@ -1,5 +1,6 @@
 //AUTH paths
 export const LOGIN_URL = "/auth/login";
+export const GUEST_URL = "/auth/guest_login"
 export const LOGOUT = "/auth/logout";
 export const REGISTER_URL = "/auth/register";
 export const USER_CONTEXT = "/auth/context/";

@@ -53,7 +53,6 @@ async fn login_guest(
 ) -> Result<UserContext, StateError> {
     let user = app_state.user_guest_session(payload.username)?;
     cookies.add(Cookie::new(TOKEN, user.auth_token.to_owned()));
-    println!("{:?}", user);
     Ok(user)
 }
 
@@ -292,9 +291,9 @@ async fn quoridor_game(
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    // tracing_subscriber::registry()
+    //     .with(tracing_subscriber::fmt::layer())
+    //     .init();
 
     let state = AppState::new_as_arc();
     let state_for_thread = state.clone();

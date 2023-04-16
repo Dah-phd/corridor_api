@@ -1,6 +1,6 @@
 import { Setter, createSignal } from "solid-js";
 import { showMessage } from "../Message";
-import { LOGIN_URL, LOGOUT, REGISTER_URL, USER_CONTEXT, getCookie, setCookie } from "./utils"
+import { GUEST_URL, LOGIN_URL, LOGOUT, REGISTER_URL, USER_CONTEXT, getCookie, setCookie } from "./utils"
 import { joinQuoriodrGame } from "./lobbies";
 import { finishTransition, startTransition } from "../Transition";
 import { QuoridorSession } from "./game_quoridor";
@@ -73,7 +73,7 @@ export function registerGuest(
     setSession: Setter<QuoridorSession | null>,
     after?: () => void
 ) {
-    fetch(LOGIN_URL, {
+    fetch(GUEST_URL, {
         method: 'post',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: username })
