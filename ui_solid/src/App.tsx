@@ -43,8 +43,9 @@ function App() {
         <Match when={getQuoridorWS() && quoridorSession()}>
           <GameView
             context={[userContext, contextSetter]}
-            ws={getQuoridorWS()}
-            session={quoridorSession()}
+            ws={getQuoridorWS() as WebSocket}
+            session={quoridorSession() as QuoridorSession}
+            setWS={setQuoridorWS}
           />
         </Match>
       </Switch>

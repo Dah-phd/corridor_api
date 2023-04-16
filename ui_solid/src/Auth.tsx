@@ -49,7 +49,7 @@ export function GuestSignIn( props:{
             <h1>Sign In as Guest</h1>
             <div>
                 <input type="text" ref={username} placeholder="Username" />
-                <button class="std_btn" onClick={newGuestClick}>Register as Guest:</button>
+                <button class="std_btn" onClick={newGuestClick}>Register as Guest</button>
             </div>
         </div>
     )

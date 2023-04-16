@@ -4,6 +4,11 @@ import { createSignal, Switch, Match, onMount, onCleanup, Accessor, Setter, crea
 import { finishTransition, startTransition } from "./Transition";
 import { UserContext } from "./functions/auth";
 import { hostQuoriodrCPU, hostQuoriodrGame } from "./functions/lobbies";
+import { QuoridorBoard } from "./Quoridor";
+import { QuoridorSession } from "./functions/game_quoridor";
+import { concede } from "./functions/game_quoridor";
+import { MessageBoard, showMessages, switchShowMessages, unreadMessages, setUnreadMessages } from "./Chat";
+import { showMessage } from "./Message";
 
 // LOGIN VIEW
 
@@ -28,12 +33,12 @@ export function LoginView(props: {
                         contextSetter={props.context[1]}
                         setWS={props.setWS}
                         setSession={props.setSession}
-                    /> : <UserCreation 
+                    /> : <UserCreation
                         contextSetter={props.context[1]}
                         setWS={props.setWS}
                         setSession={props.setSession}
                     />}
-                    <GuestSignIn 
+                    <GuestSignIn
                         contextSetter={props.context[1]}
                         setWS={props.setWS}
                         setSession={props.setSession}
@@ -49,6 +54,7 @@ export function LoginView(props: {
 export const [showSpinner, switchSpinner] = createSignal(false);
 
 import { Lobbies } from "./Lobby"
+import { setCookie } from "./functions/utils";
 
 export function LobbiesView(props: {
     context: [Accessor<UserContext | null>, Setter<UserContext | null>],
@@ -57,6 +63,7 @@ export function LobbiesView(props: {
 },
 ) {
     let user = props.context[0]() as UserContext;
+    setCookie(user.authToken)
     function MatchMaking() {
         function cancelLobby(ev: KeyboardEvent) { if (ev.key === "Escape") { } }
         onMount(() => { document.addEventListener('keydown', cancelLobby) });
@@ -91,33 +98,30 @@ export function LobbiesView(props: {
 
 // GAME VIEW
 
-import { QuoridorBoard } from "./Quoridor";
-import { QuoridorSession } from "./functions/game_quoridor";
-import { concede } from "./functions/game_quoridor";
-import { MessageBoard, showMessages, switchShowMessages, unreadMessages, setUnreadMessages } from "./Chat";
-
 export function GameView(props: {
     context: [Accessor<UserContext | null>, Setter<UserContext | null>],
-    ws: WebSocket | null,
-    session: QuoridorSession | null
+    ws: WebSocket,
+    session: QuoridorSession,
+    setWS: Setter<WebSocket | null>
 }) {
-    if (!props.ws) return;
-    let right_btn, right_fn
-    if (props.session?.winner) {
-        alert(`Winner is ${props.session.winner}`);
-        right_btn = "Back to Lobbies";
-        right_fn = () => props.ws?.close();
-    } else {
-        right_btn = "Concede";
-        right_fn = () => concede(props.ws as WebSocket);
+    const [rightBtn, setRightBtn] = createSignal("Concede");
+    const rightFN = () => {
+        if (rightBtn() == 'Concede') concede(props.ws as WebSocket)
+        else { props.ws.close(); props.setWS(null); }
     }
 
+    createEffect(() => {
+        if (props.session.winner) {
+            showMessage(`Winner is ${props.session.winner}`);
+            setRightBtn("Back to Lobbies");
+        } else setRightBtn("Concede")
+    })
 
     return (
         <>
             <Nav
                 context={props.context}
-                right={{ text: right_btn , style: 'color:red;', click: right_fn }}
+                right={{ text: rightBtn(), style: 'color:red;', click: rightFN }}
                 left={{
                     text: !showMessages() ? `Open Chat ${unreadMessages() ? unreadMessages() : ""}` : "Back to Game",
                     style: unreadMessages() ? "color: red;" : "",

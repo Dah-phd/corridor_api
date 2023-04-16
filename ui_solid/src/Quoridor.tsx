@@ -1,4 +1,4 @@
-import { Accessor, For, createSignal } from "solid-js"
+import { For, createEffect, createSignal } from "solid-js"
 import {
     QuoridorSession,
     makeQuoridorMove,
@@ -64,7 +64,13 @@ function removeHoverWallBorders(row: number, col: number) {
     }
 }
 
-function Tile(props: { row: number, column: number, session: QuoridorSession, ws: WebSocket, user: UserContext }) {
+function Tile(props: {
+    row: number,
+    column: number,
+    session: QuoridorSession,
+    ws: WebSocket,
+    user: UserContext
+}) {
     return (
         <div
             class={setTileClass(props.row, props.column, props.session)}
@@ -83,7 +89,12 @@ function Tile(props: { row: number, column: number, session: QuoridorSession, ws
     )
 }
 
-function Row(props: { row: number, session: QuoridorSession, user:UserContext, ws: WebSocket }) {
+function Row(props: {
+    row: number,
+    session: QuoridorSession,
+    user: UserContext,
+    ws: WebSocket
+}) {
     return (
         <div class="row">
             <For each={ARRAY_OF_IDS}>
@@ -93,10 +104,9 @@ function Row(props: { row: number, session: QuoridorSession, user:UserContext, w
     )
 }
 
-export function QuoridorBoard(props: {ws:WebSocket, session: QuoridorSession | null, user:UserContext}) {
+export function QuoridorBoard(props: { ws: WebSocket, session: QuoridorSession | null, user: UserContext }) {
     if (!props.session) return;
-    console.log(props.session)
-
+    console.log(props.session);
     function currentRed(player: string) {
         return props.session?.current == player ? "color:red" : ""
     }
@@ -138,40 +148,3 @@ export function QuoridorBoard(props: {ws:WebSocket, session: QuoridorSession | n
         </div>
     )
 }
-
-
-const json_game_example = {
-    "up_player": "a",
-    "down_player": "b",
-    "game": {
-        "up_player": [1, 4],
-        "down_player": [8, 4],
-        "up_player_free_walls": 8,
-        "down_player_free_walls": 8,
-        "vertical_walls": [[5, 5]],
-        "horizontal_walls": [[2, 2]]
-    },
-    "turn": 0,
-    "current": "b",
-    "winner": null,
-    "only_player_moves_allowed": false
-}
-
-const json_game_example2 = {
-    "up_player": "a",
-    "down_player": "b",
-    "game": {
-        "up_player": [1, 4],
-        "down_player": [7, 4],
-        "up_player_free_walls": 7,
-        "down_player_free_walls": 7,
-        "vertical_walls": [[5, 5], [1, 3], [0, 4]],
-        "horizontal_walls": [[2, 2], [1, 4],],
-    },
-    "turn": 0,
-    "current": "b",
-    "winner": null,
-    "only_player_moves_allowed": false
-}
-
-export { json_game_example, json_game_example2 }

@@ -79,6 +79,7 @@ export function hostQuoriodrGame(
 export function getLobbies(setter: Setter<Array<string>>) {
     fetch(QUORIDOR_QUE).then(
         resp => {
+            console.log(resp)
             if (resp.ok) { resp.json().then(setter) }
             else showMessage("Unable to retrive QUE!")
         })
