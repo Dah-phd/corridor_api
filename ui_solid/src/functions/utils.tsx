@@ -25,10 +25,11 @@ export function createSocket<T>(uri_str: string, setter: (ev: T | null) => void,
     url.protocol = url.protocol.replace("http", "ws");
     let socket = new WebSocket(url);
     socket.onopen = () => console.log(`socket open on ${url}`);
-    socket.onmessage = (ev: MessageEvent) => {setter(ev.data)};
+    socket.onmessage = (ev: MessageEvent) => {
+        setter(ev.data)
+    };
     socket.onclose = (ev) => {
         if (closeCallback) { closeCallback(ev) }
-        setter(null)
     };
     return socket
 }

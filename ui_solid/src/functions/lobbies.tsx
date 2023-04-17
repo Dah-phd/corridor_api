@@ -1,7 +1,7 @@
 import { QuoridorSession } from "./game_quoridor";
 import { createSocket } from "./utils";
 import { QUORIDOR_HOST, QUORIDOR_JOIN, QUORIDOR_SOLO, QUORIDOR_QUE, GAME_CHANNEL } from "./utils"
-import { Setter, createSignal } from "solid-js";
+import { Accessor, Setter } from "solid-js";
 import { UserContext } from "./auth";
 import { showMessage } from "../Message";
 
@@ -61,14 +61,29 @@ export function joinQuoriodrGame(
 }
 
 export function hostQuoriodrGame(
-    setWS: Setter<WebSocket>,
+    getWS: Accessor<WebSocket|null>,
+    setWS: Setter<WebSocket|null>,
     setSession: Setter<QuoridorSession | null>,
     after?: () => void
 ) {
-    createSocket<string>(
+    if (getWS()?.OPEN) {showMessage("Already connected to game, refresh to reconnect!"); return};
+    const builderSocket = createSocket<string>(
         QUORIDOR_HOST,
         (ev) => {
-            let game_socket = createSocket<QuoridorSession>(GAME_CHANNEL + ev, setSession);
+            console.log("event on builder", ev)
+            builderSocket.close(); 
+            let game_socket = createSocket(
+                GAME_CHANNEL + ev,
+                (message) => {
+                    try {
+                        const qSession = JSON.parse(message as string);
+                        setSession(qSession);
+                    } catch (e) {
+                        alert("Failed to read message from server! Try reloading the page.")
+                    }
+                }
+
+            );
             setWS(game_socket);
             if (after) after();
         },

@@ -105,8 +105,8 @@ function Row(props: {
 }
 
 export function QuoridorBoard(props: { ws: WebSocket, session: QuoridorSession | null, user: UserContext }) {
+    console.log("game session: ", props.session);
     if (!props.session) return;
-    console.log(props.session);
     function currentRed(player: string) {
         return props.session?.current == player ? "color:red" : ""
     }

@@ -44,8 +44,8 @@ export function login(
         .finally(() => { if (after) after() })
 }
 
-export function logout(contextSetter: Setter<UserContext | null>) {
-    fetch(LOGOUT).then(_ => contextSetter(null)).catch(console.log);
+export function logout(contextSetter: Setter<UserContext | null>, setWS:Setter<WebSocket|null>, setSession:Setter<QuoridorSession|null>) {
+    fetch(LOGOUT).then(_ => {contextSetter(null); setWS(null); setSession(null)}).catch(console.log);
 }
 
 export function registerUser(

@@ -81,6 +81,9 @@ async fn quoridor_que_join(
     State(app_state): State<Arc<AppState>>,
 ) -> Result<UserContext, StateError> {
     let mut user = app_state.get_session(cookies.get(TOKEN))?;
+    if user.email == host_name {
+        return Err(StateError::UnsupportedDataType("Same user".into()));
+    }
     let sender = app_state
         .quoridor_que
         .lock()
@@ -300,7 +303,8 @@ async fn main() {
 
     tokio::task::spawn(async move {
         loop {
-            state_for_thread.recurent_clean_up();
+            state_for_thread.heart_beat();
+            println!("bum");
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
         }
     });

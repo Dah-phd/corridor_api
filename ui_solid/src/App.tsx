@@ -37,6 +37,7 @@ function App() {
           <LobbiesView
             context={[userContext, contextSetter]}
             setSession={setQuoridorSession}
+            getWS={getQuoridorWS}
             setWS={setQuoridorWS}
           />
         </Match>
@@ -45,6 +46,7 @@ function App() {
             context={[userContext, contextSetter]}
             ws={getQuoridorWS() as WebSocket}
             session={quoridorSession() as QuoridorSession}
+            setSession={setQuoridorSession}
             setWS={setQuoridorWS}
           />
         </Match>

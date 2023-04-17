@@ -150,7 +150,7 @@ impl AppState {
         self.quoridor_games.lock().unwrap().remove(id);
     }
 
-    pub fn recurent_clean_up(&self) {
+    pub fn heart_beat(&self) {
         let mut chats_to_drop = Vec::new();
         let mut games = self.quoridor_games.lock().unwrap();
         games.retain(|key, (game, sender)| {

@@ -36,6 +36,8 @@ export function concede(ws: WebSocket) {
 }
 
 export function makeQuoridorMove(row: number, col: number, game: QuoridorSession, ws: WebSocket, user:UserContext, callback: MoveFunc) {
+    console.log(ws.url);
+    console.log(ws.readyState);
     if (ws.readyState !== WebSocket.OPEN) return;
     if (!user || game.current != user.email) return;
     ws.send(JSON.stringify(callback(row, col)));
