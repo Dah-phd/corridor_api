@@ -4,6 +4,7 @@ import { QUORIDOR_HOST, QUORIDOR_JOIN, QUORIDOR_SOLO, QUORIDOR_QUE, GAME_CHANNEL
 import { Accessor, Setter } from "solid-js";
 import { UserContext } from "./auth";
 import { showMessage } from "../Message";
+import { setQuoridorSession, setQuoridorWS } from "../App";
 
 function joinGame(context: UserContext, setWS: Setter<WebSocket>, setSession: Setter<QuoridorSession | null>) {
     if (context.activeMatch) {
@@ -25,8 +26,6 @@ function joinGame(context: UserContext, setWS: Setter<WebSocket>, setSession: Se
 }
 
 export function hostQuoriodrCPU(
-    setWS: Setter<WebSocket>,
-    setSession: Setter<QuoridorSession | null>,
     after?: () => void
 ) {
     fetch(QUORIDOR_SOLO)
@@ -35,7 +34,7 @@ export function hostQuoriodrCPU(
                 alert("Unable to create solo game!");
                 return;
             }
-            status.json().then(msg => joinGame(msg, setWS, setSession))
+            status.json().then(msg => joinGame(msg, setQuoridorWS, setQuoridorSession))
         })
         .catch((err) => { alert(err) })
         .finally(() => { if (after) after() })
@@ -44,8 +43,6 @@ export function hostQuoriodrCPU(
 
 export function joinQuoriodrGame(
     id: string,
-    setWS: Setter<WebSocket>,
-    setSession: Setter<QuoridorSession | null>,
     after?: () => void
 ) {
     fetch(QUORIDOR_JOIN + id)
@@ -54,7 +51,7 @@ export function joinQuoriodrGame(
                 alert("Unable to join game!");
                 return
             }
-            status.json().then(msg => joinGame(msg, setWS, setSession))
+            status.json().then(msg => joinGame(msg, setQuoridorWS, setQuoridorSession))
         })
         .catch(alert)
         .finally(() => { if (after) after() })
@@ -62,8 +59,6 @@ export function joinQuoriodrGame(
 
 export function hostQuoriodrGame(
     getWS: Accessor<WebSocket|null>,
-    setWS: Setter<WebSocket|null>,
-    setSession: Setter<QuoridorSession | null>,
     after?: () => void
 ) {
     if (getWS()?.OPEN) {showMessage("Already connected to game, refresh to reconnect!"); return};
@@ -77,14 +72,14 @@ export function hostQuoriodrGame(
                 (message) => {
                     try {
                         const qSession = JSON.parse(message as string);
-                        setSession(qSession);
+                        setQuoridorSession(qSession);
                     } catch (e) {
                         alert("Failed to read message from server! Try reloading the page.")
                     }
                 }
 
             );
-            setWS(game_socket);
+            setQuoridorWS(game_socket);
             if (after) after();
         },
         () => { if (after) after() }

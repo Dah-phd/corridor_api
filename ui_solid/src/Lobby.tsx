@@ -1,7 +1,6 @@
 import { createSignal, For, onCleanup, Setter } from "solid-js"
 import { finishTransition, startTransition } from "./Transition"
 import { joinQuoriodrGame, getLobbies } from "./functions/lobbies"
-import { QuoridorSession } from "./functions/game_quoridor"
 
 const lobbyInterval = "lobbyInterval"
 
@@ -19,10 +18,7 @@ function killLobbyInterval() {
 
 
 
-export function Lobbies(props: {
-    setWS: Setter<WebSocket | null>,
-    setSession: Setter<QuoridorSession | null>
-}) {
+export function Lobbies() {
     const [activeLobbies, setLobbies] = createSignal<Array<string>>([]);
     createLobbyInterval(setLobbies);
     onCleanup(killLobbyInterval);
@@ -34,7 +30,7 @@ export function Lobbies(props: {
                     return (
                         <div class="lobby_struct" onClick={() => {
                             startTransition();
-                            joinQuoriodrGame(host, props.setWS, props.setSession, finishTransition)
+                            joinQuoriodrGame(host, finishTransition)
                         }}>
                             {host}
                         </div>

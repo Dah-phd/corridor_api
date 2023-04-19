@@ -8,11 +8,12 @@ import { Transition, inTransition, isLoading } from "./Transition";
 import { QuoridorSession } from "./functions/game_quoridor";
 export const IS_MOBILE = navigator.userAgent.toLowerCase().match(/mobile/i);
 
+export const [quoridorSession, setQuoridorSession] = createSignal<QuoridorSession | null>(null);
+export const [getQuoridorWS, setQuoridorWS] = createSignal<null | WebSocket>(null);
+
 
 function App() {
-  const [getQuoridorWS, setQuoridorWS] = createSignal<null | WebSocket>(null);
   const [userContext, contextSetter] = createSignal<UserContext | null>(null);
-  const [quoridorSession, setQuoridorSession] = createSignal<QuoridorSession | null>(null);
   getContext(contextSetter, setQuoridorWS, setQuoridorSession);
 
   if (IS_MOBILE) {
@@ -29,16 +30,12 @@ function App() {
           <LoadAnimation />
           <LoginView
             context={[userContext, contextSetter]}
-            setWS={setQuoridorWS}
-            setSession={setQuoridorSession}
           />
         </Match>
         <Match when={!getQuoridorWS()}>
           <LobbiesView
             context={[userContext, contextSetter]}
-            setSession={setQuoridorSession}
             getWS={getQuoridorWS}
-            setWS={setQuoridorWS}
           />
         </Match>
         <Match when={getQuoridorWS() && quoridorSession()}>
@@ -46,8 +43,6 @@ function App() {
             context={[userContext, contextSetter]}
             ws={getQuoridorWS() as WebSocket}
             session={quoridorSession() as QuoridorSession}
-            setSession={setQuoridorSession}
-            setWS={setQuoridorWS}
           />
         </Match>
       </Switch>

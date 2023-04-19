@@ -2,12 +2,11 @@ import { Setter } from "solid-js";
 import { login, registerUser, registerGuest, UserContext } from "./functions/auth";
 import { QuoridorSession } from "./functions/game_quoridor";
 import { startTransition, finishTransition } from "./Transition";
+import { setQuoridorSession, setQuoridorWS } from "./App";
 
 
 export function UserSignIn(props: {
     contextSetter: Setter<UserContext | null>,
-    setWS: Setter<WebSocket | null>,
-    setSession: Setter<QuoridorSession | null>,
 }) {
     let username: any, password: any;
     function loginClick() {
@@ -15,8 +14,8 @@ export function UserSignIn(props: {
         login(
             username.value, password.value,
             props.contextSetter,
-            props.setWS,
-            props.setSession,
+            setQuoridorWS,
+            setQuoridorSession,
             finishTransition
         );
         password.value = null
@@ -35,13 +34,11 @@ export function UserSignIn(props: {
 
 export function GuestSignIn( props:{
     contextSetter: Setter<UserContext | null>,
-    setWS: Setter<WebSocket | null>,
-    setSession: Setter<QuoridorSession | null>,
 }) {
     let username: any;
     function newGuestClick() {
         startTransition(true);
-        registerGuest(username.value, props.contextSetter, props.setWS, props.setSession, finishTransition);
+        registerGuest(username.value, props.contextSetter, setQuoridorWS, setQuoridorSession, finishTransition);
         username.value = null
     }
     return (
@@ -57,8 +54,6 @@ export function GuestSignIn( props:{
 
 export function UserCreation(props: {
         contextSetter: Setter<UserContext | null>,
-        setWS: Setter<WebSocket | null>,
-        setSession: Setter<QuoridorSession | null>,
 }) {
     let username: any, password: any, password2: any, email: any;
     function newUserClick() {
@@ -66,7 +61,7 @@ export function UserCreation(props: {
         startTransition(true);
         registerUser(
             username.value, password.value, email.value,
-            props.contextSetter, props.setWS, props.setSession,
+            props.contextSetter, setQuoridorWS, setQuoridorSession,
             finishTransition
         );
         [username, password, password2, email].forEach((el) => el.value = null);

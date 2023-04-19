@@ -16,8 +16,6 @@ import { GuestSignIn, UserCreation, UserSignIn } from "./Auth";
 
 export function LoginView(props: {
     context: [Accessor<UserContext | null>, Setter<UserContext | null>],
-    setWS: Setter<WebSocket | null>,
-    setSession: Setter<QuoridorSession | null>
 }) {
     const [signInState, showSignIn] = createSignal(true);
     return (
@@ -26,24 +24,16 @@ export function LoginView(props: {
                 context={props.context}
                 left={{ text: "Sign In", click: () => { showSignIn(true) } }}
                 right={{ text: "Create New Account", click: () => { showSignIn(false) } }}
-                setWS={props.setWS}
-                setSession={props.setSession}
             />
             <div class='full_screen_centered'>
                 <div class="form_container">
                     {signInState() ? <UserSignIn
                         contextSetter={props.context[1]}
-                        setWS={props.setWS}
-                        setSession={props.setSession}
                     /> : <UserCreation
                         contextSetter={props.context[1]}
-                        setWS={props.setWS}
-                        setSession={props.setSession}
                     />}
                     <GuestSignIn
                         contextSetter={props.context[1]}
-                        setWS={props.setWS}
-                        setSession={props.setSession}
                     />
                 </div >
             </div>
@@ -57,12 +47,11 @@ export const [showSpinner, switchSpinner] = createSignal(false);
 
 import { Lobbies } from "./Lobby"
 import { setCookie } from "./functions/utils";
+import { setQuoridorWS } from "./App";
 
 export function LobbiesView(props: {
     context: [Accessor<UserContext | null>, Setter<UserContext | null>],
-    setSession: Setter<QuoridorSession | null>,
     getWS: Accessor<WebSocket | null>,
-    setWS: Setter<WebSocket | null>
 },
 ) {
     let user = props.context[0]() as UserContext;
@@ -74,7 +63,7 @@ export function LobbiesView(props: {
         return (
             <>
                 <div class="covering-panel" ><div class="spin"></div></div>
-                <Nav context={props.context} setWS={props.setWS} setSession={props.setSession} />
+                <Nav context={props.context} />
                 <h1>Looking for opponent ...</h1><hr /><h3>Press Esc to cancel</h3>
             </>
         )
@@ -87,13 +76,11 @@ export function LobbiesView(props: {
             <Match when={!showSpinner()}>
                 <Nav
                     context={props.context}
-                    left={{ text: "Game VS CPU", click: () => { hostQuoriodrCPU(props.setWS, props.setSession, finishTransition); startTransition() } }}
-                    right={{ text: "Create Lobby", click: () => { hostQuoriodrGame(props.getWS, props.setWS, props.setSession, finishTransition); startTransition() } }}
-                    setWS={props.setWS}
-                    setSession={props.setSession}
+                    left={{ text: "Game VS CPU", click: () => { hostQuoriodrCPU(finishTransition); startTransition() } }}
+                    right={{ text: "Create Lobby", click: () => { hostQuoriodrGame(props.getWS, finishTransition); startTransition() } }}
                 />
                 <div class="full_screen_centered">
-                    <Lobbies setWS={props.setWS} setSession={props.setSession} />
+                    <Lobbies />
                 </div>
                 <Footer />
             </Match>
@@ -107,13 +94,11 @@ export function GameView(props: {
     context: [Accessor<UserContext | null>, Setter<UserContext | null>],
     ws: WebSocket,
     session: QuoridorSession,
-    setWS: Setter<WebSocket | null>,
-    setSession:Setter<QuoridorSession|null>
 }) {
     const [rightBtn, setRightBtn] = createSignal("Concede");
     const rightFN = () => {
         if (rightBtn() == 'Concede') concede(props.ws as WebSocket)
-        else { props.ws.close(); props.setWS(null); }
+        else { props.ws.close(); setQuoridorWS(null); }
     }
 
     createEffect(() => {
@@ -133,8 +118,6 @@ export function GameView(props: {
                     style: unreadMessages() ? "color: red;" : "",
                     click: () => { switchShowMessages(!showMessages()); if (showMessages()) setUnreadMessages(0) }
                 }}
-                setWS={props.setWS}
-                setSession={props.setSession}
             />
             <QuoridorBoard ws={props.ws} session={props.session} user={props.context[0]() as UserContext} />
             <div class="full_screen_centered">
