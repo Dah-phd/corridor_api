@@ -32,12 +32,10 @@ type MoveFunc = (row: number, col: number) => PlayerMove
 
 export function concede(ws: WebSocket) {
     if (ws.readyState !== WebSocket.OPEN) return;
-    ws.send("Concede")
+    ws.send(JSON.stringify("Concede"))
 }
 
 export function makeQuoridorMove(row: number, col: number, game: QuoridorSession, ws: WebSocket, user:UserContext, callback: MoveFunc) {
-    console.log(ws.url);
-    console.log(ws.readyState);
     if (ws.readyState !== WebSocket.OPEN) return;
     if (!user || game.current != user.email) return;
     ws.send(JSON.stringify(callback(row, col)));

@@ -51,7 +51,6 @@ import { setQuoridorWS } from "./App";
 
 export function LobbiesView(props: {
     context: [Accessor<UserContext | null>, Setter<UserContext | null>],
-    getWS: Accessor<WebSocket | null>,
 },
 ) {
     let user = props.context[0]() as UserContext;
@@ -77,7 +76,7 @@ export function LobbiesView(props: {
                 <Nav
                     context={props.context}
                     left={{ text: "Game VS CPU", click: () => { hostQuoriodrCPU(finishTransition); startTransition() } }}
-                    right={{ text: "Create Lobby", click: () => { hostQuoriodrGame(props.getWS, finishTransition); startTransition() } }}
+                    right={{ text: "Create Lobby", click: () => { hostQuoriodrGame(finishTransition); startTransition() } }}
                 />
                 <div class="full_screen_centered">
                     <Lobbies />

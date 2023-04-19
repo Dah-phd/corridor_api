@@ -1,7 +1,7 @@
 import { LoginView, LobbiesView, GameView } from "./AppViews";
 import { LoadAnimation } from "./LoadAnimation";
 import { getContext, UserContext } from './functions/auth';
-import { Switch, Match, createSignal, Accessor } from "solid-js";
+import { Switch, Match, createSignal } from "solid-js";
 import { Message, message, showMessage } from "./Message";
 import { Profile, showProfile } from "./Profile";
 import { Transition, inTransition, isLoading } from "./Transition";
@@ -35,7 +35,6 @@ function App() {
         <Match when={!getQuoridorWS()}>
           <LobbiesView
             context={[userContext, contextSetter]}
-            getWS={getQuoridorWS}
           />
         </Match>
         <Match when={getQuoridorWS() && quoridorSession()}>

@@ -4,7 +4,7 @@ import { QUORIDOR_HOST, QUORIDOR_JOIN, QUORIDOR_SOLO, QUORIDOR_QUE, GAME_CHANNEL
 import { Accessor, Setter } from "solid-js";
 import { UserContext } from "./auth";
 import { showMessage } from "../Message";
-import { setQuoridorSession, setQuoridorWS } from "../App";
+import { getQuoridorWS, setQuoridorSession, setQuoridorWS } from "../App";
 
 function joinGame(context: UserContext, setWS: Setter<WebSocket>, setSession: Setter<QuoridorSession | null>) {
     if (context.activeMatch) {
@@ -58,10 +58,9 @@ export function joinQuoriodrGame(
 }
 
 export function hostQuoriodrGame(
-    getWS: Accessor<WebSocket|null>,
     after?: () => void
 ) {
-    if (getWS()?.OPEN) {showMessage("Already connected to game, refresh to reconnect!"); return};
+    if (getQuoridorWS()?.OPEN) {showMessage("Already connected to game, refresh to reconnect!"); return};
     const builderSocket = createSocket<string>(
         QUORIDOR_HOST,
         (ev) => {
