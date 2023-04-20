@@ -10,11 +10,10 @@ export const IS_MOBILE = navigator.userAgent.toLowerCase().match(/mobile/i);
 
 export const [quoridorSession, setQuoridorSession] = createSignal<QuoridorSession | null>(null);
 export const [getQuoridorWS, setQuoridorWS] = createSignal<null | WebSocket>(null);
-
+export const [userContext, userContextSetter] = createSignal<UserContext | null>(null);
 
 function App() {
-  const [userContext, contextSetter] = createSignal<UserContext | null>(null);
-  getContext(contextSetter, setQuoridorWS, setQuoridorSession);
+  getContext();
 
   if (IS_MOBILE) {
     showMessage("Quoridor is not yet optimized to be used on mobile device. Use at your own risk!")
@@ -23,23 +22,18 @@ function App() {
   return (
     <>
       <Switch>
-        <Match when={!inTransition && !isLoading}>
+        <Match when={inTransition() || isLoading()}>
           <Transition />
         </Match>
         <Match when={!userContext()}>
           <LoadAnimation />
-          <LoginView
-            context={[userContext, contextSetter]}
-          />
+          <LoginView />
         </Match>
         <Match when={!getQuoridorWS()}>
-          <LobbiesView
-            context={[userContext, contextSetter]}
-          />
+          <LobbiesView />
         </Match>
         <Match when={getQuoridorWS() && quoridorSession()}>
           <GameView
-            context={[userContext, contextSetter]}
             ws={getQuoridorWS() as WebSocket}
             session={quoridorSession() as QuoridorSession}
           />

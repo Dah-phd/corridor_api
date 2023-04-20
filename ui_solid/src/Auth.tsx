@@ -1,23 +1,13 @@
-import { Setter } from "solid-js";
-import { login, registerUser, registerGuest, UserContext } from "./functions/auth";
-import { QuoridorSession } from "./functions/game_quoridor";
+import { login, registerUser, registerGuest } from "./functions/auth";
 import { startTransition, finishTransition } from "./Transition";
-import { setQuoridorSession, setQuoridorWS } from "./App";
+import { showMessage } from "./Message";
 
 
-export function UserSignIn(props: {
-    contextSetter: Setter<UserContext | null>,
-}) {
+export function UserSignIn() {
     let username: any, password: any;
     function loginClick() {
         startTransition(true);
-        login(
-            username.value, password.value,
-            props.contextSetter,
-            setQuoridorWS,
-            setQuoridorSession,
-            finishTransition
-        );
+        login(username.value, password.value, finishTransition);
         password.value = null
     }
     return (
@@ -32,13 +22,11 @@ export function UserSignIn(props: {
     )
 }
 
-export function GuestSignIn( props:{
-    contextSetter: Setter<UserContext | null>,
-}) {
+export function GuestSignIn() {
     let username: any;
     function newGuestClick() {
         startTransition(true);
-        registerGuest(username.value, props.contextSetter, setQuoridorWS, setQuoridorSession, finishTransition);
+        registerGuest(username.value, finishTransition);
         username.value = null
     }
     return (
@@ -52,18 +40,12 @@ export function GuestSignIn( props:{
     )
 }
 
-export function UserCreation(props: {
-        contextSetter: Setter<UserContext | null>,
-}) {
+export function UserCreation() {
     let username: any, password: any, password2: any, email: any;
     function newUserClick() {
-        if (password.value != password2.value) return alert('Passwords do not match!');
+        if (password.value != password2.value) return showMessage('Passwords do not match!');
         startTransition(true);
-        registerUser(
-            username.value, password.value, email.value,
-            props.contextSetter, setQuoridorWS, setQuoridorSession,
-            finishTransition
-        );
+        registerUser(username.value, password.value, email.value, finishTransition);
         [username, password, password2, email].forEach((el) => el.value = null);
     }
     return (

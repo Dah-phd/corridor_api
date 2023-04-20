@@ -1,8 +1,6 @@
-import { Accessor, Setter } from "solid-js";
-import { UserContext, logout } from "./functions/auth";
+import { logout } from "./functions/auth";
 import { profileSwitch } from "./Profile";
-import { QuoridorSession } from "./functions/game_quoridor";
-import { setQuoridorSession, setQuoridorWS } from "./App";
+import { userContext } from "./App";
 
 type btn = {
     click: CallableFunction,
@@ -25,12 +23,12 @@ function ButtonBase(props: btn) {
     )
 }
 
-export function Nav(props: { 
-    left?: btn, 
-    right?: btn, 
+export function Nav(props: {
+    left?: btn,
+    right?: btn,
     showLogo?: boolean,
-    context:[Accessor<UserContext|null>, Setter<UserContext|null>] }) {
-    const username = props.context[0]();
+}) {
+    const username = userContext();
     return (
         <nav>
             <div class="nav_block">
@@ -39,7 +37,7 @@ export function Nav(props: {
             </div>
             <div class="image_nav"></div>
             <div class="nav_block">
-                <div class="box">{!username ? <></> : <ButtonBase text="Logout" click={() => logout(props.context[1], setQuoridorWS, setQuoridorSession)} />}</div>
+                <div class="box">{!username ? <></> : <ButtonBase text="Logout" click={() => logout()} />}</div>
                 <div class="box">{!props.right ? <></> : <ButtonBase {...props.right} />}</div>
             </div>
         </nav>
