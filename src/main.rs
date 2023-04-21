@@ -179,6 +179,7 @@ async fn join_chat(
     Path(id): Path<String>,
     State(app_state): State<Arc<AppState>>,
 ) -> Response {
+    println!("starting chat socket!");
     let session = app_state.get_session(cookies.get(TOKEN));
     if session.is_err() {
         return session.into_response();
@@ -207,16 +208,11 @@ async fn join_chat(
                 if matches!(&payload, Message::Close(_)) {
                     return;
                 }
-                if let Ok(json_message) = payload.into_text() {
-                    if let Ok(chat_message) = from_str::<ChatMessage>(&json_message) {
-                        if matches!(&chat_message, ChatMessage::Message { user, .. } if user == &player) {
-                            let _ = channel_send.send(chat_message);
-                            continue;
-                        }
-                    }
+                if let Ok(message) = payload.into_text() {
+                    let _ = channel_send.send(
+                        ChatMessage {user: player.to_owned(), message, timestamp:0}
+                    );
                 }
-                let _ = channel_send.send(ChatMessage::MessageError(player.to_owned()));
-                // might remove it if unused by frontend
             }
         });
 

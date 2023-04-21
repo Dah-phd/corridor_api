@@ -9,8 +9,9 @@ import { QuoridorSession } from "./functions/game_quoridor";
 export const IS_MOBILE = navigator.userAgent.toLowerCase().match(/mobile/i);
 
 export const [quoridorSession, setQuoridorSession] = createSignal<QuoridorSession | null>(null);
-export const [getQuoridorWS, setQuoridorWS] = createSignal<null | WebSocket>(null);
+export const [getQuoridorWS, setQuoridorWS] = createSignal<WebSocket | null>(null);
 export const [userContext, userContextSetter] = createSignal<UserContext | null>(null);
+export const [getChatWS, setChatWS] = createSignal<null | WebSocket>(null);
 
 function App() {
   getContext();

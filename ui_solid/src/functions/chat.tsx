@@ -1,9 +1,6 @@
-import { pushNewMsg, messageNotification } from "../Chat";
-import { createSignal, from } from "solid-js";
-import { CHAT_CHANNEL } from "./utils";
-
-
-export const ACTIVE_CHAT = "activeChat";
+import { getChatWS, setChatWS, userContext } from "../App";
+import { pushNewMsg } from "../Chat";
+import { CHAT_CHANNEL, createSocket } from "./utils"
 
 export interface Message {
     user: string,
@@ -11,17 +8,23 @@ export interface Message {
     timestamp: number,
 }
 
-export interface ChatID {
-    MatchID: string
-}
-
 export function sendMsg(msg: string) {
-    //TODO!
+    if (!userContext()) return;
+    getChatWS()?.send(msg)
 }
 
-
-export function connectChat() {
-    //TODO!
+export function createChat(id: string) {
+    console.log('Building chat socket on ' + id);
+    let socket = createSocket(CHAT_CHANNEL + id,
+        (message) => {
+            console.log("chat message", message);
+            try {
+                pushNewMsg(JSON.parse(message as string));
+            } catch (e) { console.log(e); }
+        },
+        (_) => { setChatWS(null) }
+    )
+    setChatWS(socket)
 }
 
 export function updateScroll(element: HTMLElement | null) {

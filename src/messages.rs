@@ -60,13 +60,10 @@ impl IntoResponse for UserContext {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub enum ChatMessage {
-    Message {
-        user: String,
-        message: String,
-        timestamp: i64,
-    },
-    MessageError(String),
+pub struct ChatMessage {
+    pub user: String,
+    pub message: String,
+    pub timestamp: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

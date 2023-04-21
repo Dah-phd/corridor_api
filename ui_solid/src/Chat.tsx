@@ -7,23 +7,18 @@ export const [newMsg, pushNewMsg] = createSignal<Message | null>(null);
 
 export const [showMessages, switchShowMessages] = createSignal(false);
 
-function getOldMessages(board_id: string): Array<Message> {
-    const chat = sessionStorage.getItem(board_id)
-    return chat ? JSON.parse(chat) : []
-}
+const CHAT = 'chat_history'
 
 export function messageNotification() {
     if (!showMessages()) setUnreadMessages(unreadMessages() + 1);
 }
 
-function pushMessage(msg: Message | null): Array<Message> | undefined {
-    const gameID = null;
-    if (!gameID) return;
-    const board_id = `chat_${JSON.stringify(gameID)}`
-    const chat = getOldMessages(board_id);
-    if (msg) chat.push(msg);
-    sessionStorage.setItem(board_id, JSON.stringify(chat));
-    return chat
+function pushMessage(msg: Message | null): Array<Message> {
+    const chat = sessionStorage.getItem(CHAT);
+    let chat_history = chat ? JSON.parse(chat) : [];
+    if (msg) chat_history.push(msg);
+    sessionStorage.setItem(CHAT, JSON.stringify(chat_history));
+    return chat_history
 }
 
 const [lastSender, setLastSender] = createSignal<string>();

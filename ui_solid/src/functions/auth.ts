@@ -1,9 +1,8 @@
-import { Setter } from "solid-js";
 import { showMessage } from "../Message";
 import { GUEST_URL, LOGIN_URL, LOGOUT, REGISTER_URL, USER_CONTEXT, getCookie, setCookie } from "./utils"
 import { joinQuoriodrGame } from "./lobbies";
 import { finishTransition, startTransition } from "../Transition";
-import { setQuoridorSession, setQuoridorWS, userContextSetter } from "../App";
+import { setChatWS, setQuoridorSession, setQuoridorWS, userContextSetter } from "../App";
 
 export interface UserContext {
     email: string,
@@ -39,7 +38,7 @@ export function login(
 }
 
 export function logout() {
-    fetch(LOGOUT).then(_ => { userContextSetter(null); setQuoridorWS(null); setQuoridorSession(null) }).catch(console.log);
+    fetch(LOGOUT).then(_ => { userContextSetter(null); setQuoridorWS(null); setQuoridorSession(null); setChatWS(null); }).catch(console.log);
 }
 
 export function registerUser(

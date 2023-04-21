@@ -1,71 +1,65 @@
-import { QuoridorSession } from "./game_quoridor";
 import { createSocket } from "./utils";
 import { QUORIDOR_HOST, QUORIDOR_JOIN, QUORIDOR_SOLO, QUORIDOR_QUE, GAME_CHANNEL } from "./utils"
-import { Accessor, Setter } from "solid-js";
+import { Setter } from "solid-js";
 import { UserContext } from "./auth";
 import { showMessage } from "../Message";
 import { getQuoridorWS, setQuoridorSession, setQuoridorWS } from "../App";
+import { createChat } from "./chat";
 
-function joinGame(context: UserContext, setWS: Setter<WebSocket>, setSession: Setter<QuoridorSession | null>) {
+function joinGame(context: UserContext) {
     if (context.activeMatch) {
         let socket = createSocket<string>(
             GAME_CHANNEL + context.activeMatch,
             (message) => {
                 try {
                     const qSession = JSON.parse(message as string);
-                    setSession(qSession);
+                    setQuoridorSession(qSession);
                 } catch (e) {
-                    alert("Failed to read message from server! Try reloading the page.")
+                    showMessage("Failed to read message from server! Try reloading the page.");
+                    console.log(e);
                 }
-            }
+            },
         );
-        setWS(socket);
+        setQuoridorWS(socket);
+        createChat(context.activeMatch);
     } else {
         showMessage("Unable to create match, please try again later!")
     }
 }
 
-export function hostQuoriodrCPU(
-    after?: () => void
-) {
+export function hostQuoriodrCPU(after?: () => void) {
     fetch(QUORIDOR_SOLO)
         .then((status) => {
             if (!status.ok) {
-                alert("Unable to create solo game!");
+                showMessage("Unable to create solo game!");
                 return;
             }
-            status.json().then(msg => joinGame(msg, setQuoridorWS, setQuoridorSession))
+            status.json().then(joinGame)
         })
         .catch((err) => { alert(err) })
         .finally(() => { if (after) after() })
-
 }
 
-export function joinQuoriodrGame(
-    id: string,
-    after?: () => void
-) {
+export function joinQuoriodrGame(id: string, after?: () => void) {
     fetch(QUORIDOR_JOIN + id)
         .then((status) => {
             if (!status.ok) {
                 alert("Unable to join game!");
                 return
             }
-            status.json().then(msg => joinGame(msg, setQuoridorWS, setQuoridorSession))
+            status.json().then(joinGame)
         })
         .catch(alert)
         .finally(() => { if (after) after() })
 }
 
-export function hostQuoriodrGame(
-    after?: () => void
-) {
-    if (getQuoridorWS()?.OPEN) {showMessage("Already connected to game, refresh to reconnect!"); return};
+export function hostQuoriodrGame(after?: () => void) {
+    if (getQuoridorWS()?.OPEN) { showMessage("Already connected to game, refresh to reconnect!"); return };
     const builderSocket = createSocket<string>(
         QUORIDOR_HOST,
         (ev) => {
             console.log("event on builder", ev)
-            builderSocket.close(); 
+            builderSocket.close();
             let game_socket = createSocket(
                 GAME_CHANNEL + ev,
                 (message) => {
@@ -79,9 +73,9 @@ export function hostQuoriodrGame(
 
             );
             setQuoridorWS(game_socket);
-            if (after) after();
+            createChat(ev as string);
         },
-        () => { if (after) after() }
+        (_) => { if (after) after() }
     );
 }
 

@@ -37,7 +37,7 @@ export const [showSpinner, switchSpinner] = createSignal(false);
 
 import { Lobbies } from "./Lobby"
 import { setCookie } from "./functions/utils";
-import { setQuoridorWS, userContext } from "./App";
+import { setChatWS, setQuoridorWS, userContext } from "./App";
 
 export function LobbiesView() {
     let user = userContext() as UserContext;
@@ -82,14 +82,16 @@ export function GameView(props: {
     const [rightBtn, setRightBtn] = createSignal("Concede");
     const rightFN = () => {
         if (rightBtn() == 'Concede') concede(props.ws as WebSocket)
-        else { props.ws.close(); setQuoridorWS(null); }
+        else { props.ws.close(); setQuoridorWS(null); setChatWS(null); }
     }
 
     createEffect(() => {
         if (props.session.winner) {
             showMessage(`Winner is ${props.session.winner}`);
             setRightBtn("Back to Lobbies");
-        } else setRightBtn("Concede")
+        } else {
+            setRightBtn("Concede");
+        }
     })
 
     return (
