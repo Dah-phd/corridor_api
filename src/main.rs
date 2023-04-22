@@ -1,233 +1,335 @@
-#[macro_use]
-extern crate rocket;
-use rocket::http::Status;
-use rocket::serde::json::Json;
-use rocket::tokio::sync::broadcast::Sender;
-use rocket::State;
-mod game_matches;
-use game_matches::{ActiveGames, GameType};
-mod game_lobbies;
-use game_lobbies::{Lobby, LobbyBase, MatchLobbies};
-mod game_interface;
-use game_interface::{GenericGame, PlayerMove, PlayerMoveResult};
 mod auth;
+mod errors;
 mod messages;
-use messages::{ChatID, Message};
 mod quoridor;
-#[macro_use]
-extern crate diesel;
-mod models;
+mod state;
+//internals
+use errors::StateError;
+use messages::{
+    ChatMessage, GuestLogin, PlayerMove, PlayerMoveResult, QuoridorMatchMeta, UserContext, UserCreate, UserLogin,
+};
+use state::AppState;
+//std
+use std::sync::Arc;
+// extern creates
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+use axum::extract::{Path, State};
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
+use axum::routing::{delete, get, post};
+use axum::{Json, Router};
+use futures::{sink::SinkExt, stream::StreamExt};
+use serde_json::{from_str, to_string};
+use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
+use tower_http::services::ServeDir;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-//chat
-#[post("/chat/sender", data = "<msg>")]
-fn post_message(msg: Json<Message>, token: auth::Token, queue: &State<Sender<Message>>, sessions: &State<ActiveGames>) {
-    match &msg.id {
-        ChatID::MatchID(owner) => {
-            let lobby = sessions.get_game_by_player(&owner);
-            if !lobby.is_some() || !lobby.unwrap().contains_player(&token.user) {
-                return;
+const TOKEN: &str = "auth_token";
+
+async fn login(
+    State(app_state): State<Arc<AppState>>,
+    cookies: Cookies,
+    Json(payload): Json<UserLogin>,
+) -> Result<UserContext, StateError> {
+    let mut user = app_state.user_get_with_session(&payload.email, &payload.password)?;
+    cookies.add(Cookie::new(TOKEN.to_owned(), user.auth_token.to_owned()));
+    user.active_match = app_state.quoridor_get_id_by_player(&user.email);
+    Ok(user)
+}
+
+async fn logout(State(app_state): State<Arc<AppState>>, cookies: Cookies) -> StatusCode {
+    let maybe_token = cookies.get(TOKEN);
+    cookies.remove(Cookie::named(TOKEN));
+    if let Some(token) = maybe_token {
+        app_state.user_end_session(token)
+    }
+    StatusCode::OK
+}
+
+async fn login_guest(
+    State(app_state): State<Arc<AppState>>,
+    cookies: Cookies,
+    Json(payload): Json<GuestLogin>,
+) -> Result<UserContext, StateError> {
+    let user = app_state.user_guest_session(payload.username)?;
+    cookies.add(Cookie::new(TOKEN, user.auth_token.to_owned()));
+    Ok(user)
+}
+
+async fn create_user(
+    State(app_state): State<Arc<AppState>>,
+    Json(payload): Json<UserCreate>,
+) -> Result<UserContext, StateError> {
+    app_state.user_create_with_session(payload.username, payload.email, payload.password)
+}
+
+async fn auth_context(State(app_state): State<Arc<AppState>>, cookies: Cookies) -> Result<UserContext, StateError> {
+    let mut user = app_state.get_session(cookies.get(TOKEN))?;
+    user.active_match = app_state.quoridor_get_id_by_player(&user.email);
+    Ok(user)
+}
+
+async fn quoridor_cpu(cookies: Cookies, State(app_state): State<Arc<AppState>>) -> Result<UserContext, StateError> {
+    let mut user = app_state.get_session(cookies.get(TOKEN))?;
+    user.active_match = app_state.quoridor_new_game(&vec![user.email.to_owned()]);
+    Ok(user)
+}
+
+async fn quoridor_que_join(
+    cookies: Cookies,
+    Path(host_name): Path<String>,
+    State(app_state): State<Arc<AppState>>,
+) -> Result<UserContext, StateError> {
+    let mut user = app_state.get_session(cookies.get(TOKEN))?;
+    if user.email == host_name {
+        return Err(StateError::UnsupportedDataType("Same user".into()));
+    }
+    let sender = app_state
+        .quoridor_que
+        .lock()
+        .unwrap()
+        .remove(&host_name)
+        .ok_or(StateError::NotFound)?;
+    user.active_match = app_state.quoridor_new_game(&vec![host_name, user.email.to_owned()]);
+    if let Some(game) = &user.active_match {
+        match sender.send(game.to_owned()) {
+            Ok(_) => return Ok(user),
+            Err(_) => app_state.quoridor_drop_by_id(game),
+        }
+    }
+    Err(StateError::ServerError)
+}
+
+async fn quoridor_que_host(cookies: Cookies, ws: WebSocketUpgrade, State(app_state): State<Arc<AppState>>) -> Response {
+    let player = match app_state.get_session(cookies.get(TOKEN)) {
+        Ok(player) => player.email,
+        Err(error) => return error.into_response(),
+    };
+
+    ws.on_upgrade(|socket| async move {
+        let (channel_send, channel_recv) = tokio::sync::oneshot::channel::<String>();
+        let (mut sender, mut reciever) = socket.split();
+        let app_state_recv = Arc::clone(&app_state);
+
+        app_state
+            .quoridor_que
+            .lock()
+            .unwrap()
+            .insert(player.to_owned(), channel_send);
+
+        let mut send_task = tokio::spawn(async move {
+            if let Ok(game_id) = channel_recv.await {
+                let _ = sender.send(game_id.into()).await;
+            }
+        });
+
+        let mut recv_task = tokio::spawn(async move {
+            while let Some(Ok(msg)) = reciever.next().await {
+                if matches!(&msg, Message::Close(_)) {
+                    app_state_recv.quoridor_que.lock().unwrap().remove(&player);
+                }
+            }
+        });
+
+        tokio::select! {
+            _tx_s = (&mut send_task) => {
+                recv_task.abort()
+            },
+            _tx_r = (&mut recv_task) => {
+                send_task.abort()
             }
         }
-    }
-    let _res = queue.send(msg.into_inner());
+    })
 }
 
-#[get("/game_chat/<owner>")]
-async fn session_chat(
-    owner: String,
-    queue: &State<Sender<Message>>,
-    mut end: rocket::Shutdown,
-) -> rocket::response::stream::EventStream![] {
-    let mut rx = queue.subscribe();
-    rocket::response::stream::EventStream! {
-        loop {
-            let msg = rocket::tokio::select! {
-                msg = rx.recv() => match msg {
-                    Ok(msg) => if msg.id == ChatID::MatchID(owner.to_owned()) {msg} else {continue},
-                    Err(rocket::tokio::sync::broadcast::error::RecvError::Closed) => break,
-                    Err(rocket::tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                },
-                _ = &mut end => break,
-            };
-            yield rocket::response::stream::Event::json(&msg);
-        }
-    }
+async fn quoridor_que_get(
+    cookies: Cookies,
+    State(app_state): State<Arc<AppState>>,
+) -> Result<Json<Vec<String>>, StateError> {
+    app_state.get_session(cookies.get(TOKEN))?;
+    let que: Json<_> = app_state
+        .quoridor_que
+        .lock()
+        .unwrap()
+        .keys()
+        .map(|key| key.to_owned())
+        .collect::<Vec<_>>()
+        .into();
+    Ok(que)
 }
 
-// lobbies
-pub fn concede_active_games_by_player(
-    token: auth::Token,
-    active_games: &State<ActiveGames>,
-    game_events: &State<Sender<GenericGame>>,
-) {
-    while let Some(mut game) = active_games.get_game_by_player(&token.user) {
-        let owner = game.get_owner();
-        game.make_move(PlayerMove::Concede(token.user.to_owned()));
-        let _res = game_events.send(game);
-        active_games.drop_by_owner(&owner);
-    }
+async fn quoridor_get_matches(
+    cookies: Cookies,
+    State(app_state): State<Arc<AppState>>,
+) -> Result<Json<Vec<QuoridorMatchMeta>>, StateError> {
+    app_state.get_session(cookies.get(TOKEN))?;
+    let data: Vec<QuoridorMatchMeta> = app_state
+        .quoridor_games
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(key, (game, _))| (key.to_owned(), game.read().unwrap().clone()).into())
+        .collect();
+    Ok(data.into())
 }
 
-#[post("/create_lobby", data = "<lobby_base>")]
-fn make_lobby(
-    lobby_base: Json<LobbyBase>,
-    token: auth::Token,
-    lobbies: &State<MatchLobbies>,
-    active_games: &State<ActiveGames>,
-    game_events: &State<Sender<GenericGame>>,
-) -> Json<Option<String>> {
-    let lobby = lobby_base.into_inner();
-    if let GameType::Unknown = lobby.game {
-        lobbies.drop(&token.user);
-    } else if lobby.owner == token.user && !token.is_guest() {
-        if let Some(owner) = lobbies.new_lobby(lobby) {
-            concede_active_games_by_player(token, active_games, game_events);
-            return Json(Some(owner));
-        }
+async fn join_chat(
+    cookies: Cookies,
+    ws: WebSocketUpgrade,
+    Path(id): Path<String>,
+    State(app_state): State<Arc<AppState>>,
+) -> Response {
+    println!("starting chat socket!");
+    let session = app_state.get_session(cookies.get(TOKEN));
+    if session.is_err() {
+        return session.into_response();
     }
-    return Json(None);
-}
+    let player = session.unwrap().email;
 
-#[get("/join/<owner>")]
-fn join_lobby(
-    owner: String,
-    token: auth::Token,
-    lobbies: &State<MatchLobbies>,
-    active_games: &State<ActiveGames>,
-    lobby_events: &State<Sender<Lobby>>,
-    game_events: &State<Sender<GenericGame>>,
-) -> Json<Option<String>> {
-    if owner == quoridor::cpu::CPU {
-        return Json(active_games.create_cpu_game(&token.user, GameType::Quoridor));
-    }
-    if let Some(lobby) = lobbies.add_player_to_lobby(&owner, &token.user) {
-        concede_active_games_by_player(token, active_games, game_events);
-        if lobby.is_ready() {
-            active_games.append(&lobby);
-        }
-        let _res = lobby_events.send(lobby);
-        return Json(Some(owner.to_owned()));
-    }
-    return Json(None);
-}
-
-#[get("/active_lobbies")]
-fn get_all_lobbies(lobbies: &State<MatchLobbies>, _auth: auth::Token) -> Json<Vec<Lobby>> {
-    Json(lobbies.get_all())
-}
-
-#[get("/lobby_events/<owner>")]
-async fn lobby_events(
-    _token: auth::Token,
-    owner: String,
-    queue: &State<Sender<Lobby>>,
-    mut end: rocket::Shutdown,
-) -> rocket::response::stream::EventStream![] {
-    let mut rx = queue.subscribe();
-    rocket::response::stream::EventStream! {
-        loop {
-            let msg = rocket::tokio::select! {
-                msg = rx.recv() => match msg {
-                    Ok(msg) => if msg.owner == owner {msg} else {continue},
-                    Err(rocket::tokio::sync::broadcast::error::RecvError::Closed) => break,
-                    Err(rocket::tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                },
-                _ = &mut end => break,
-            };
-            yield rocket::response::stream::Event::json(&msg);
-        }
-    }
-}
-
-// sessions
-#[post("/move/<owner>", data = "<player_move>")]
-fn make_move(
-    owner: String,
-    player_move: Json<PlayerMove>,
-    sessions: &State<ActiveGames>,
-    token: auth::Token,
-    queue: &State<Sender<GenericGame>>,
-) -> Json<PlayerMoveResult> {
-    if !player_move.confirm_player(&token.user) {
-        return Json(PlayerMoveResult::Unauthorized);
-    }
-    let move_result: PlayerMoveResult = match sessions.make_move(&owner, player_move.into_inner()) {
-        Some(v) => v,
-        None => return Json(PlayerMoveResult::Unknown),
+    let channel_send = if let Some(channel) = app_state.chat_channel.read().unwrap().get(&id) {
+        channel.clone()
+    } else {
+        return StateError::NotFound.into_response();
     };
-    if let PlayerMoveResult::Ok = move_result {
-        let _ = queue.send(sessions.get_game_by_owner(&owner).unwrap());
-    }
-    Json(move_result)
-}
 
-#[get("/game_state/<owner>")]
-fn get_game_state_by_owner(
-    owner: String,
-    token: auth::Token,
-    active_sessions: &State<ActiveGames>,
-) -> Result<Json<GenericGame>, Status> {
-    if let Some(game) = active_sessions.get_game_by_owner(&owner) {
-        if game.contains_player(&token.user) {
-            return Ok(Json(game));
+    ws.on_upgrade(|socket: WebSocket| async move {
+        let mut channel_recv = channel_send.subscribe();
+        let (mut sender, mut reciever) = socket.split();
+
+        let mut send_task = tokio::spawn(async move {
+            while let Ok(message) = channel_recv.recv().await {
+                if let Ok(json_msg) = to_string(&message) {
+                    let _ = sender.send(json_msg.into()).await;
+                }
+            }
+        });
+        let mut recv_task = tokio::spawn(async move {
+            while let Some(Ok(payload)) = reciever.next().await {
+                if matches!(&payload, Message::Close(_)) {
+                    return;
+                }
+                if let Ok(message) = payload.into_text() {
+                    let _ = channel_send.send(ChatMessage {
+                        user: player.to_owned(),
+                        message,
+                        timestamp: 0,
+                    });
+                }
+            }
+        });
+
+        tokio::select! {
+            _tx_s = (&mut send_task) => {
+                recv_task.abort();
+            },
+            _tx_r = (&mut recv_task) => {
+                send_task.abort();
+            }
         }
-        return Err(Status::Forbidden);
-    }
-    Err(Status::NotFound)
+    })
 }
 
-#[get("/game_events/<owner>")]
-async fn match_events(
-    owner: String,
-    queue: &State<Sender<GenericGame>>,
-    _auth: auth::Token,
-    mut end: rocket::Shutdown,
-) -> rocket::response::stream::EventStream![] {
-    let mut rx = queue.subscribe();
-    rocket::response::stream::EventStream! {
-        loop {
-            let msg = rocket::tokio::select! {
-                msg = rx.recv() => match msg {
-                    Ok(msg) => if msg.get_owner() == owner {msg} else {continue},
-                    Err(rocket::tokio::sync::broadcast::error::RecvError::Closed) => break,
-                    Err(rocket::tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                },
-                _ = &mut end => break,
-            };
-            yield rocket::response::stream::Event::json(&msg);
+async fn quoridor_game(
+    cookies: Cookies,
+    ws: WebSocketUpgrade,
+    Path(id): Path<String>,
+    State(app_state): State<Arc<AppState>>,
+) -> Response {
+    let player_recv = match app_state.get_session(cookies.get(TOKEN)) {
+        Ok(user_context) => user_context.email,
+        Err(err) => return err.into_response(),
+    };
+    ws.on_upgrade(|mut socket: WebSocket| async move {
+        let (game, channel_send) = match app_state.quoridor_get_full(&id) {
+            Some(payload) => payload,
+            None => return,
         };
-    }
+        let game_snapshot = to_string(&game.read().unwrap().clone());
+        if let Ok(msg) = game_snapshot {
+            let _ = socket.send(msg.into()).await;
+        }
+
+        let mut channel_recv = channel_send.subscribe();
+        let (mut sender, mut reciever) = socket.split();
+        let sender_game = Arc::clone(&game);
+
+        let mut send_task = tokio::spawn(async move {
+            while let Ok(msg) = channel_recv.recv().await {
+                let game_snapshot = to_string(&sender_game.read().unwrap().clone());
+                if let Ok(snapshot) = game_snapshot {
+                    let _ = sender.send(snapshot.into()).await;
+                    if matches!(msg, PlayerMoveResult::GameFinished) {
+                        return;
+                    }
+                }
+            }
+        });
+
+        let mut recv_task = tokio::spawn(async move {
+            while let Some(Ok(msg)) = reciever.next().await {
+                if matches!(&msg, Message::Close(_)) {
+                    return;
+                }
+                if let Ok(msg) = msg.into_text() {
+                    if let Ok(player_move) = from_str::<PlayerMove>(&msg) {
+                        let move_result = game.write().unwrap().make_move(player_move, &player_recv);
+                        let _ = channel_send.send(move_result);
+                    }
+                }
+            }
+        });
+
+        tokio::select! {
+            _rv_a = (&mut send_task) => {
+                recv_task.abort();
+            },
+            _rv_b = (&mut recv_task) => {
+                send_task.abort();
+            }
+        }
+    })
 }
 
-#[launch]
-fn rocket() -> _ {
-    rocket::build()
-        .mount(
-            "/",
-            routes![
-                auth::login,
-                auth::logout,
-                auth::register,
-                auth::get_user_name_from_token,
-                auth::update_email,
-                auth::update_password,
-                post_message,
-                make_move,
-                session_chat,
-                match_events,
-                get_game_state_by_owner,
-                get_all_lobbies,
-                join_lobby,
-                make_lobby,
-                lobby_events,
-            ],
-        )
-        .mount("/", rocket::fs::FileServer::from(rocket::fs::relative!("static/build")))
-        .manage(rocket::tokio::sync::broadcast::channel::<Message>(1024).0)
-        .manage(rocket::tokio::sync::broadcast::channel::<GenericGame>(1024).0)
-        .manage(ActiveGames::new())
-        .manage(rocket::tokio::sync::broadcast::channel::<Lobby>(1024).0)
-        .manage(MatchLobbies::new())
-        .manage(models::DBLink::new("./db.sqlite3"))
-        .manage(auth::AuthTokenServices::new())
+#[tokio::main]
+async fn main() {
+    let filter_layer = EnvFilter::try_from_default_env()
+        .or_else(|_| EnvFilter::try_new("debug"))
+        .unwrap();
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(filter_layer)
+        .init();
+
+    let state = AppState::new_as_arc();
+    let state_for_thread = state.clone();
+
+    tokio::task::spawn(async move {
+        loop {
+            state_for_thread.heart_beat();
+            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+        }
+    });
+
+    let app = Router::new()
+        .nest_service("/", ServeDir::new("static/build"))
+        .route("/auth/login", post(login))
+        .route("/auth/guest_login", post(login_guest))
+        .route("/auth/context", get(auth_context))
+        .route("/auth/logout", delete(logout))
+        .route("/auth/register", post(create_user))
+        .route("/chat/:id", get(join_chat))
+        .route("/quoridor/que", get(quoridor_que_get))
+        .route("/quoridor/que/join/:host_name", get(quoridor_que_join))
+        .route("/quoridor/que/host", get(quoridor_que_host))
+        .route("/quoridor/matches", get(quoridor_get_matches))
+        .route("/quoridor/solo", get(quoridor_cpu))
+        .route("/quoridor/events/:id", get(quoridor_game))
+        .with_state(state)
+        .layer(CookieManagerLayer::new());
+
+    axum::Server::bind(&"0.0.0.0:8000".parse().unwrap())
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 }
