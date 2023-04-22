@@ -109,7 +109,6 @@ async fn quoridor_que_host(cookies: Cookies, ws: WebSocketUpgrade, State(app_sta
     ws.on_upgrade(|socket| async move {
         let (channel_send, channel_recv) = tokio::sync::oneshot::channel::<String>();
         let (mut sender, mut reciever) = socket.split();
-        let app_state_recv = Arc::clone(&app_state);
 
         app_state
             .quoridor_que
@@ -123,22 +122,14 @@ async fn quoridor_que_host(cookies: Cookies, ws: WebSocketUpgrade, State(app_sta
             }
         });
 
-        let mut recv_task = tokio::spawn(async move {
-            while let Some(Ok(msg)) = reciever.next().await {
-                if matches!(&msg, Message::Close(_)) {
-                    app_state_recv.quoridor_que.lock().unwrap().remove(&player);
-                }
-            }
-        });
-
         tokio::select! {
-            _tx_s = (&mut send_task) => {
-                recv_task.abort()
-            },
-            _tx_r = (&mut recv_task) => {
+            _tx_s = (&mut send_task) => {},
+            _tx_r = (&mut reciever.next()) => {
                 send_task.abort()
             }
         }
+
+        app_state.quoridor_que.lock().unwrap().remove(&player);
     })
 }
 
@@ -179,7 +170,6 @@ async fn join_chat(
     Path(id): Path<String>,
     State(app_state): State<Arc<AppState>>,
 ) -> Response {
-    println!("starting chat socket!");
     let session = app_state.get_session(cookies.get(TOKEN));
     if session.is_err() {
         return session.into_response();

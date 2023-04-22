@@ -6,7 +6,7 @@ import { showMessage } from "./Message";
 export function UserSignIn() {
     let username: any, password: any;
     function loginClick() {
-        startTransition(true);
+        startTransition("Loading ...");
         login(username.value, password.value, finishTransition);
         password.value = null
     }
@@ -25,7 +25,7 @@ export function UserSignIn() {
 export function GuestSignIn() {
     let username: any;
     function newGuestClick() {
-        startTransition(true);
+        startTransition("Loading ...");
         registerGuest(username.value, finishTransition);
         username.value = null
     }
@@ -44,7 +44,7 @@ export function UserCreation() {
     let username: any, password: any, password2: any, email: any;
     function newUserClick() {
         if (password.value != password2.value) return showMessage('Passwords do not match!');
-        startTransition(true);
+        startTransition("Loading ...");
         registerUser(username.value, password.value, email.value, finishTransition);
         [username, password, password2, email].forEach((el) => el.value = null);
     }

@@ -153,6 +153,7 @@ impl AppState {
     pub fn heart_beat(&self) {
         let mut chats_to_drop = Vec::new();
         let mut games = self.quoridor_games.lock().unwrap();
+        println!("Active games: {}", games.len());
         games.retain(|key, (game, sender)| {
             let mut game = game.write().unwrap();
             game.timeout_guard();

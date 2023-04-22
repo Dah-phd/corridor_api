@@ -62,7 +62,7 @@ export function LobbiesView() {
             <Match when={!showSpinner()}>
                 <Nav
                     left={{ text: "Game VS CPU", click: () => { hostQuoriodrCPU(finishTransition); startTransition() } }}
-                    right={{ text: "Create Lobby", click: () => { hostQuoriodrGame(finishTransition); startTransition() } }}
+                    right={{ text: "Create Lobby", click: () => { hostQuoriodrGame(finishTransition); startTransition("Looking for game ...") } }}
                 />
                 <div class="full_screen_centered">
                     <Lobbies />

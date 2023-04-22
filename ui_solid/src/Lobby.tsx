@@ -8,7 +8,7 @@ const LOBBY_INTERVAL = "lobbyInterval"
 function createLobbyInterval() {
     sessionStorage.setItem(
         LOBBY_INTERVAL,
-        window.setInterval(() => { getLobbies(); }, 10000).toString()
+        window.setInterval(() => { getLobbies(); }, 5000).toString()
     )
 }
 

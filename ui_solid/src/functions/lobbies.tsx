@@ -1,6 +1,5 @@
 import { createSocket } from "./utils";
 import { QUORIDOR_HOST, QUORIDOR_JOIN, QUORIDOR_SOLO, QUORIDOR_QUE, GAME_CHANNEL } from "./utils"
-import { Setter } from "solid-js";
 import { UserContext } from "./auth";
 import { showMessage } from "../Message";
 import { getQuoridorWS, setQuoridorSession, setQuoridorWS } from "../App";
@@ -45,7 +44,7 @@ export function joinQuoriodrGame(id: string, after?: () => void) {
     fetch(QUORIDOR_JOIN + id)
         .then((response) => {
             if (!response.ok) {
-                alert("Unable to join game!");
+                showMessage("Unable to join game!");
                 return
             }
             response.json().then(joinGame)

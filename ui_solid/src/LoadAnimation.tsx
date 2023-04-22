@@ -12,6 +12,7 @@ export function LoadAnimation() {
 }
 
 export const [inTransition, startTransition] = createSignal(false);
+
 export function transition() {
     startTransition(true);
     setTimeout(() => { startTransition(false) }, 500);
