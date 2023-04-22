@@ -22,7 +22,7 @@ use futures::{sink::SinkExt, stream::StreamExt};
 use serde_json::{from_str, to_string};
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
 use tower_http::services::ServeDir;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 const TOKEN: &str = "auth_token";
 
@@ -209,9 +209,11 @@ async fn join_chat(
                     return;
                 }
                 if let Ok(message) = payload.into_text() {
-                    let _ = channel_send.send(
-                        ChatMessage {user: player.to_owned(), message, timestamp:0}
-                    );
+                    let _ = channel_send.send(ChatMessage {
+                        user: player.to_owned(),
+                        message,
+                        timestamp: 0,
+                    });
                 }
             }
         });
@@ -290,9 +292,14 @@ async fn quoridor_game(
 
 #[tokio::main]
 async fn main() {
-    // tracing_subscriber::registry()
-    //     .with(tracing_subscriber::fmt::layer())
-    //     .init();
+    let filter_layer = EnvFilter::try_from_default_env()
+        .or_else(|_| EnvFilter::try_new("debug"))
+        .unwrap();
+
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(filter_layer)
+        .init();
 
     let state = AppState::new_as_arc();
     let state_for_thread = state.clone();
@@ -300,7 +307,6 @@ async fn main() {
     tokio::task::spawn(async move {
         loop {
             state_for_thread.heart_beat();
-            println!("bum");
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
         }
     });
