@@ -1,4 +1,4 @@
-function Footer() {
+export function Footer() {
     return (
         <footer>
             Powered by Axum <a href="https://docs.rs/axum/latest/axum/" target="_blank" style="text-decoration: none;">🚀</a> |
@@ -7,5 +7,3 @@ function Footer() {
         </footer>
     )
 }
-
-export { Footer }
