@@ -1,13 +1,14 @@
-import { createSignal, For, onCleanup, Setter } from "solid-js"
+import { For, onCleanup } from "solid-js"
 import { finishTransition, startTransition } from "./Transition"
 import { joinQuoriodrGame, getLobbies } from "./functions/lobbies"
+import { activeLobbies } from "./App"
 
 const LOBBY_INTERVAL = "lobbyInterval"
 
-function createLobbyInterval(lobbySetter: Setter<Array<string>>) {
+function createLobbyInterval() {
     sessionStorage.setItem(
         LOBBY_INTERVAL,
-        window.setInterval(() => { getLobbies(lobbySetter); }, 10000).toString()
+        window.setInterval(() => { getLobbies(); }, 10000).toString()
     )
 }
 
@@ -17,10 +18,9 @@ function killLobbyInterval() {
 }
 
 export function Lobbies() {
-    const [activeLobbies, setLobbies] = createSignal<Array<string>>([]);
-    createLobbyInterval(setLobbies);
+    createLobbyInterval();
     onCleanup(killLobbyInterval);
-    getLobbies(setLobbies);
+    getLobbies();
     return (
         <div class="lobbies">
             <For each={activeLobbies()}>

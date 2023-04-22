@@ -5,6 +5,7 @@ import { UserContext } from "./auth";
 import { showMessage } from "../Message";
 import { getQuoridorWS, setQuoridorSession, setQuoridorWS } from "../App";
 import { createChat } from "./chat";
+import { setLobbies } from "../App";
 
 function joinGame(context: UserContext) {
     if (context.activeMatch) {
@@ -29,12 +30,12 @@ function joinGame(context: UserContext) {
 
 export function hostQuoriodrCPU(after?: () => void) {
     fetch(QUORIDOR_SOLO)
-        .then((status) => {
-            if (!status.ok) {
+        .then((response) => {
+            if (!response.ok) {
                 showMessage("Unable to create solo game!");
                 return;
             }
-            status.json().then(joinGame)
+            response.json().then(joinGame)
         })
         .catch((err) => { alert(err) })
         .finally(() => { if (after) after() })
@@ -42,12 +43,12 @@ export function hostQuoriodrCPU(after?: () => void) {
 
 export function joinQuoriodrGame(id: string, after?: () => void) {
     fetch(QUORIDOR_JOIN + id)
-        .then((status) => {
-            if (!status.ok) {
+        .then((response) => {
+            if (!response.ok) {
                 alert("Unable to join game!");
                 return
             }
-            status.json().then(joinGame)
+            response.json().then(joinGame)
         })
         .catch(alert)
         .finally(() => { if (after) after() })
@@ -67,7 +68,7 @@ export function hostQuoriodrGame(after?: () => void) {
                         const qSession = JSON.parse(message as string);
                         setQuoridorSession(qSession);
                     } catch (e) {
-                        alert("Failed to read message from server! Try reloading the page.")
+                        showMessage("Failed to read message from server! Try reloading the page.")
                     }
                 }
 
@@ -79,11 +80,10 @@ export function hostQuoriodrGame(after?: () => void) {
     );
 }
 
-export function getLobbies(setter: Setter<Array<string>>) {
+export function getLobbies() {
     fetch(QUORIDOR_QUE).then(
-        resp => {
-            console.log(resp)
-            if (resp.ok) { resp.json().then(setter) }
+        (resp) => {
+            if (resp.ok) { resp.json().then(setLobbies) }
             else showMessage("Unable to retrive QUE!")
         })
 }
