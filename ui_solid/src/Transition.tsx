@@ -35,9 +35,6 @@ export function Transition() {
                         </g>
                     </svg>
                 </div>
-                <div class='text-container'>
-                    <h2>Loading</h2>
-                </div>
                 <div class='smoke'>
                     <span></span>
                     <span></span>
