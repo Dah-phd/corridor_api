@@ -1,25 +1,29 @@
 import { createSignal } from "solid-js";
 
 const [inTransition, swithTransition] = createSignal(false);
-const [isLoading, swithLoading] = createSignal<string | null>(null);
+const [isLoading, swithLoading] = createSignal<string>();
+const [transitionBtnCB, setTransitionBtnCB] = createSignal<{cb:() => void}>();
 
-export { inTransition, isLoading };
+export { inTransition, isLoading, setTransitionBtnCB };
 
-export function startTransition(startLoading: string | null = null) {
+export function startTransition(startLoading?: string, cancelBtnProps?: {cb:() => void}) {
     swithLoading(startLoading);
     swithTransition(true);
     setTimeout(() => { swithTransition(false) }, 300);
+    setTransitionBtnCB(cancelBtnProps);
 }
 
 export function finishTransition() {
     console.log("Finishing loading!")
-    swithLoading(null);
+    swithLoading();
+    setTransitionBtnCB();
 }
 
 export function Transition() {
     return (
         <>
             {isLoading() ? <h1>{isLoading()}</h1> : <></>}
+            {transitionBtnCB() ? <button class={"std_btn"} onClick={transitionBtnCB()?.cb} > Cancel </button> : <></>}
             <div class='rocket-container'>
                 <div class='structure'>
                     <svg height='352' id='rocket-svg' version='1.1' viewbox='0 0 59.266662 93.133333' width='224' xmlns='http://www.w3.org/2000/svg'>

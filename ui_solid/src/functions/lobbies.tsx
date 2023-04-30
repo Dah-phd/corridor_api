@@ -5,6 +5,7 @@ import { showMessage } from "../Message";
 import { getQuoridorWS, setQuoridorSession, setQuoridorWS } from "../App";
 import { createChat } from "./chat";
 import { setLobbies } from "../App";
+import { finishTransition, startTransition } from "../Transition";
 
 function joinGame(context: UserContext) {
     if (context.activeMatch) {
@@ -27,7 +28,7 @@ function joinGame(context: UserContext) {
     }
 }
 
-export function hostQuoriodrCPU(after?: () => void) {
+export function hostQuoriodrCPU() {
     fetch(QUORIDOR_SOLO)
         .then((response) => {
             if (!response.ok) {
@@ -37,7 +38,7 @@ export function hostQuoriodrCPU(after?: () => void) {
             response.json().then(joinGame)
         })
         .catch((err) => { alert(err) })
-        .finally(() => { if (after) after() })
+        .finally(finishTransition)
 }
 
 export function joinQuoriodrGame(id: string, after?: () => void) {
@@ -53,7 +54,7 @@ export function joinQuoriodrGame(id: string, after?: () => void) {
         .finally(() => { if (after) after() })
 }
 
-export function hostQuoriodrGame(after?: () => void) {
+export function hostQuoriodrGame() {
     if (getQuoridorWS()?.OPEN) { showMessage("Already connected to game, refresh to reconnect!"); return };
     const builderSocket = createSocket<string>(
         QUORIDOR_HOST,
@@ -75,8 +76,10 @@ export function hostQuoriodrGame(after?: () => void) {
             setQuoridorWS(game_socket);
             createChat(ev as string);
         },
-        (_) => { if (after) after() }
+        (_) => { finishTransition() }
     );
+    console.log("setting cancel!!");
+    startTransition("Looking for game ...", { cb: () =>  builderSocket.close() });
 }
 
 export function getLobbies() {

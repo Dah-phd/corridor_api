@@ -13,9 +13,10 @@ export function UserSignIn() {
     return (
         <div style="flex-basis: 50%;" onKeyPress={(e) => { if (e.key == 'Enter') loginClick() }}>
             <h1>Sign In:</h1>
-            <div >
-                <input type="text" ref={username} placeholder="Email" />
-                <input type="password" ref={password} placeholder="Password" />
+            <div>
+                <div><input type="text" ref={username} placeholder="Email" /></div>
+                <div><input type="password" ref={password} placeholder="Password" /></div>
+                <br />
                 <button class="std_btn" onClick={loginClick}>Login</button>
             </div>
         </div>
@@ -33,7 +34,8 @@ export function GuestSignIn() {
         <div style="flex-basis: 50%;" onKeyPress={(e) => { if (e.key == 'Enter') newGuestClick() }}>
             <h1>Sign In as Guest</h1>
             <div>
-                <input type="text" ref={username} placeholder="Username" />
+                <div><input type="text" ref={username} placeholder="Username" /></div>
+                <br />
                 <button class="std_btn" onClick={newGuestClick}>Register as Guest</button>
             </div>
         </div>
@@ -48,14 +50,16 @@ export function UserCreation() {
         registerUser(username.value, password.value, email.value, finishTransition);
         [username, password, password2, email].forEach((el) => el.value = null);
     }
+    showMessage("Your email will be visible to other players as identifier!!!")
     return (
         <div style="flex-basis: 50%;" onKeyPress={(e) => { if (e.key == 'Enter') newUserClick() }}>
             <h1>Create New Account:</h1>
             <div>
-                <input type="text" ref={username} placeholder="Username" />
-                <input type="password" ref={password} placeholder="Password" />
-                <input type="password" ref={password2} placeholder="Repeat password" />
-                <input type="email" ref={email} placeholder="Email" />
+                <div><input type="text" ref={username} placeholder="Username" /></div>
+                <div><input type="password" ref={password} placeholder="Password" /></div>
+                <div><input type="password" ref={password2} placeholder="Repeat password" /></div>
+                <div><input type="email" ref={email} placeholder="Email" /></div>
+                <br />
                 <button class="std_btn" onClick={newUserClick}>Register User</button>
             </div>
         </div>

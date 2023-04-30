@@ -7,3 +7,12 @@
 # HOW TO RUN:
 ==========================
 * cargo builds and runs the APP on PROT 8000
+
+# BUILD UI:
+==========================
+* cd ui_solid
+* npm install
+* npm run build
+* npm run move
+might need env var:
+NODE_OPTIONS = "--openssl-legacy-provider"

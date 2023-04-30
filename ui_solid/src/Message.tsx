@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
 
 export const [message, showMessage] = createSignal<string>();
-export const [messageCallback, setMessageCallback] = createSignal<any>()
+export const [messageCallback, setMessageCallback] = createSignal<() => void>()
 function Ok() {
     showMessage();
     const callback = messageCallback();

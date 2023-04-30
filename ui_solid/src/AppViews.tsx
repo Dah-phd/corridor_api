@@ -1,7 +1,6 @@
 import { Nav } from "./Nav";
 import { Footer } from "./Footer";
 import { createSignal, Switch, Match, onMount, onCleanup, Accessor, Setter, createEffect, } from "solid-js";
-import { finishTransition, startTransition } from "./Transition";
 import { UserContext } from "./functions/auth";
 import { hostQuoriodrCPU, hostQuoriodrGame } from "./functions/lobbies";
 import { QuoridorBoard } from "./Quoridor";
@@ -61,8 +60,8 @@ export function LobbiesView() {
             </Match>
             <Match when={!showSpinner()}>
                 <Nav
-                    left={{ text: "Game VS CPU", click: () => { hostQuoriodrCPU(finishTransition); startTransition() } }}
-                    right={{ text: "Create Lobby", click: () => { hostQuoriodrGame(finishTransition); startTransition("Looking for game ...") } }}
+                    left={{ text: "Game VS CPU", click: () => { hostQuoriodrCPU(); } }}
+                    right={{ text: "Create Lobby", click: () => { hostQuoriodrGame(); } }}
                 />
                 <div class="full_screen_centered">
                     <Lobbies />

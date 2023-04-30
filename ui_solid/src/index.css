@@ -51,6 +51,11 @@ div.await {
   z-index: 20;
 }
 
+input {
+  font-size: large;
+  margin-bottom: 2px;
+}
+
 .spin {
   border: 16px solid #2a2a2a;
   border-radius: 50%;
