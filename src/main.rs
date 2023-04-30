@@ -2,6 +2,7 @@ mod auth;
 mod errors;
 mod messages;
 mod quoridor;
+mod leader_board;
 mod state;
 //internals
 use errors::StateError;
