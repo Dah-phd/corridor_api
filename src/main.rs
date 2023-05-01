@@ -263,12 +263,14 @@ async fn quoridor_game(
                 let game_snapshot = sender_game.read().unwrap().clone();
                 if let Ok(snapshot) = to_string(&game_snapshot) {
                     let _ = sender.send(snapshot.into()).await;
-                    if matches!(msg, PlayerMoveResult::GameFinished) {
+                    if game_snapshot.winner.is_some() && game_snapshot.contains_player(&user_context.email) {
                         app_state
                             .leaderboard
                             .lock()
                             .unwrap()
                             .process_game(&user_context, &game_snapshot);
+                    }
+                    if matches!(msg, PlayerMoveResult::GameFinished) {
                         return;
                     }
                 }

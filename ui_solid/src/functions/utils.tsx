@@ -1,21 +1,27 @@
 //AUTH paths
-export const LOGIN_URL = "/auth/login";
-export const GUEST_URL = "/auth/guest_login"
-export const LOGOUT = "/auth/logout";
-export const REGISTER_URL = "/auth/register";
-export const USER_CONTEXT = "/auth/context/";
-// export const UPDATE_PASS = "/auth/update_pass";
-// export const UPDATE_EMAIL = "/auth/update_email";
+const AUTH = "/auth/"
+export const LOGIN_URL = AUTH + "login";
+export const GUEST_URL = AUTH + "guest_login"
+export const LOGOUT = AUTH + "logout";
+export const REGISTER_URL = AUTH + "register";
+export const USER_CONTEXT = AUTH + "context/";
+export const USER_STATS = AUTH + "stats";
+// export const UPDATE_PASS = AUTH + "update_pass";
+// export const UPDATE_EMAIL = AUTH + "update_email";
 
 //CHAT paths
 export const CHAT_CHANNEL = "/chat/"; //WS
 
+//LEADERBOARD
+export const LEADERBOARD = "/leaderboard";
+
 // QUORIDOR paths
-export const QUORIDOR_QUE = "/quoridor/que"
-export const QUORIDOR_SOLO = "/quoridor/solo"
+const QUORIDOR = "/quoridor/";
+export const GAME_CHANNEL = QUORIDOR + "events/"; //WS
+export const QUORIDOR_QUE = QUORIDOR + "que";
 export const QUORIDOR_HOST = QUORIDOR_QUE + "/host"; //WS
 export const QUORIDOR_JOIN = QUORIDOR_QUE + "/join/";
-export const GAME_CHANNEL = "/quoridor/events/"; //WS
+export const QUORIDOR_SOLO = QUORIDOR + "solo";
 
 //TOKEN name
 const TOKEN = 'auth_token'
@@ -52,4 +58,24 @@ export function getCookie(cookieName:string = TOKEN):string | undefined {
             return cookie.substring(name.length, cookie.length);
         }
     }
+}
+
+export type UserStats = {
+    username: string,
+    wins: number,
+    loses: number,
+}
+
+export function LeaderBoardStat(props: { stats?: UserStats }) {
+    const kdr = (w: number | undefined, l: number | undefined) => {
+        if (w && l) return (w / (w + l));
+        return 0
+    }
+    return (
+        <>
+            <p style="color:red;font-size:large;">{props.stats?.username} </p>
+            <p>{"Wins: " + props.stats?.wins} | {"Loses: " + props.stats?.loses} | { "K/D: " + kdr(props.stats?.wins, props.stats?.loses)}</p>
+            <hr />
+        </>
+    )
 }

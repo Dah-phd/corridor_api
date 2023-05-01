@@ -3,13 +3,17 @@ use std::cmp::Ordering;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
 
-use crate::{errors::StateError, messages::UserContext, quoridor::QuoridorMatch};
+use crate::{
+    errors::StateError,
+    messages::UserContext,
+    quoridor::{cpu::CPU, QuoridorMatch},
+};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct UserLeaderBoard {
     pub username: String,
     pub wins: i32,
-    pub losses: i32,
+    pub loses: i32,
 }
 
 pub struct LeaderBoard {
@@ -26,11 +30,11 @@ impl Default for LeaderBoard {
 
 impl LeaderBoard {
     pub fn get_full_leader_board(&self) -> Vec<UserLeaderBoard> {
-        let mut board: Vec<UserLeaderBoard> = self.get().into_iter().filter(|data| data.losses > data.wins).collect();
+        let mut board: Vec<UserLeaderBoard> = self.get().into_iter().filter(|data| data.wins > data.loses).collect();
         board.sort_unstable_by(|a, b| {
             let order = b.wins.cmp(&a.wins);
             match order {
-                Ordering::Equal => (b.wins / b.losses).cmp(&(a.wins / a.losses)),
+                Ordering::Equal => (b.wins / b.loses).cmp(&(a.wins / a.loses)),
                 _ => order,
             }
         });
@@ -61,7 +65,7 @@ impl LeaderBoard {
     }
 
     pub fn process_game(&self, user_context: &UserContext, snapshot: &QuoridorMatch) {
-        if user_context.username == "GUEST" {
+        if user_context.username == "GUEST" || snapshot.contains_player(CPU) {
             return;
         }
         if let Some(winner) = &snapshot.winner {
@@ -81,7 +85,7 @@ impl LeaderBoard {
             UserLeaderBoard {
                 username: user.username.to_owned(),
                 wins: 1,
-                losses: 0,
+                loses: 0,
             }
         };
         if let Ok(value) = to_string(&record) {
@@ -94,13 +98,13 @@ impl LeaderBoard {
             return;
         }
         let record = if let Ok(mut record) = self.get_by_email(&user.email) {
-            record.losses += 1;
+            record.loses += 1;
             record
         } else {
             UserLeaderBoard {
                 username: user.username.to_owned(),
                 wins: 0,
-                losses: 1,
+                loses: 1,
             }
         };
         if let Ok(value) = to_string(&record) {
