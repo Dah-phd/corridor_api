@@ -16,7 +16,7 @@ pub struct QuoridorMatch {
     game: Quoridor,
     turn: usize,
     current: String,
-    winner: Option<String>,
+    pub winner: Option<String>,
     only_player_moves_allowed: bool,
 }
 
@@ -63,10 +63,6 @@ impl QuoridorMatch {
             self.end_turn();
         };
         result
-    }
-
-    pub fn get_winner(&self) -> Option<String> {
-        self.winner.clone()
     }
 
     pub fn contains_player(&self, player: &str) -> bool {

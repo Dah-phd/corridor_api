@@ -4,7 +4,14 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::StateError;
+use crate::leader_board::UserLeaderBoard;
 use crate::quoridor::QuoridorMatch;
+
+impl IntoResponse for UserLeaderBoard {
+    fn into_response(self) -> axum::response::Response {
+        (StatusCode::OK, Json(self).into_response()).into_response()
+    }
+}
 
 impl IntoResponse for StateError {
     fn into_response(self) -> axum::response::Response {

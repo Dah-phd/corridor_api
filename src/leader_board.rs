@@ -1,8 +1,9 @@
+use std::cmp::Ordering;
+
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
-use sled::IVec;
 
-use crate::messages::UserContext;
+use crate::{errors::StateError, messages::UserContext, quoridor::QuoridorMatch};
 
 #[derive(Serialize, Deserialize)]
 pub struct UserLeaderBoard {
@@ -25,12 +26,19 @@ impl Default for LeaderBoard {
 
 impl LeaderBoard {
     pub fn get_full_leader_board(&self) -> Vec<UserLeaderBoard> {
-        let mut board:Vec<UserLeaderBoard> = self.get().into_iter().filter(|data| data.losses > data.wins).collect();
-        board.sort_by(|a, b| a.wins.cmp(&b.wins));
+        let mut board: Vec<UserLeaderBoard> = self.get().into_iter().filter(|data| data.losses > data.wins).collect();
+        board.sort_unstable_by(|a, b| {
+            let order = b.wins.cmp(&a.wins);
+            match order {
+                Ordering::Equal => (b.wins / b.losses).cmp(&(a.wins / a.losses)),
+                _ => order,
+            }
+        });
+        board.truncate(30);
         board
     }
- 
-    pub fn get(&self) -> Vec<UserLeaderBoard> {
+
+    fn get(&self) -> Vec<UserLeaderBoard> {
         self.db
             .into_iter()
             .flatten()
@@ -42,15 +50,31 @@ impl LeaderBoard {
             .collect()
     }
 
-    fn get_by_email(&self, email: &str) -> Option<UserLeaderBoard> {
-        let record = self.db.get(email).ok()??;
-        std::str::from_utf8(&record)
-            .ok()
-            .and_then(|data| from_str::<UserLeaderBoard>(data).ok())
+    pub fn get_by_email(&self, email: &str) -> Result<UserLeaderBoard, StateError> {
+        let record = self
+            .db
+            .get(email)
+            .map_err(|_| StateError::ServerError)?
+            .ok_or(StateError::NotFound)?;
+        let serialized_record = std::str::from_utf8(&record).map_err(|_| StateError::ServerError)?;
+        from_str(serialized_record).map_err(|_| StateError::ServerError)
     }
 
-    pub fn add_win(&self, user: &UserContext) {
-        let record = if let Some(mut record) = self.get_by_email(&user.email) {
+    pub fn process_game(&self, user_context: &UserContext, snapshot: &QuoridorMatch) {
+        if user_context.username == "GUEST" {
+            return;
+        }
+        if let Some(winner) = &snapshot.winner {
+            if &user_context.email == winner {
+                self.add_win(user_context);
+            } else {
+                self.add_lose(user_context)
+            }
+        }
+    }
+
+    fn add_win(&self, user: &UserContext) {
+        let record = if let Ok(mut record) = self.get_by_email(&user.email) {
             record.wins += 1;
             record
         } else {
@@ -65,8 +89,11 @@ impl LeaderBoard {
         }
     }
 
-    pub fn add_lose(&self, user: &UserContext) {
-        let record = if let Some(mut record) = self.get_by_email(&user.email) {
+    fn add_lose(&self, user: &UserContext) {
+        if user.username == "GUEST" {
+            return;
+        }
+        let record = if let Ok(mut record) = self.get_by_email(&user.email) {
             record.losses += 1;
             record
         } else {

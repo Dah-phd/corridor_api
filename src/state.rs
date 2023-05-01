@@ -5,6 +5,7 @@ use crate::auth::Users;
 use crate::errors::StateError;
 use crate::messages::{ChatMessage, PlayerMoveResult, UserContext};
 use crate::quoridor::QuoridorMatch;
+use crate::leader_board::LeaderBoard;
 use rand::{distributions::Alphanumeric, Rng};
 use regex::Regex;
 use tokio::sync::broadcast;
@@ -24,6 +25,7 @@ pub struct AppState {
     pub quoridor_que: QuoridorQue,
     pub chat_channel: Arc<RwLock<HashMap<String, broadcast::Sender<ChatMessage>>>>,
     pub users: Arc<Mutex<Users>>,
+    pub leaderboard: Arc<Mutex<LeaderBoard>>,
     sessions: Arc<Mutex<HashMap<String, (UserContext, TimeStamp)>>>,
 }
 
@@ -158,7 +160,7 @@ impl AppState {
             let mut game = game.write().unwrap();
             game.timeout_guard();
             let _ = sender.send(PlayerMoveResult::Ok);
-            if game.get_winner().is_some() {
+            if game.winner.is_some() {
                 chats_to_drop.push(key.to_owned());
                 false
             } else {

@@ -1,11 +1,12 @@
 mod auth;
 mod errors;
+mod leader_board;
 mod messages;
 mod quoridor;
-mod leader_board;
 mod state;
 //internals
 use errors::StateError;
+use leader_board::UserLeaderBoard;
 use messages::{
     ChatMessage, GuestLogin, PlayerMove, PlayerMoveResult, QuoridorMatchMeta, UserContext, UserCreate, UserLogin,
 };
@@ -68,6 +69,18 @@ async fn auth_context(State(app_state): State<Arc<AppState>>, cookies: Cookies) 
     let mut user = app_state.get_session(cookies.get(TOKEN))?;
     user.active_match = app_state.quoridor_get_id_by_player(&user.email);
     Ok(user)
+}
+
+async fn leaderboard(State(app_state): State<Arc<AppState>>) -> Json<Vec<UserLeaderBoard>> {
+    app_state.leaderboard.lock().unwrap().get_full_leader_board().into()
+}
+
+async fn get_personal_stats(
+    State(app_state): State<Arc<AppState>>,
+    cookies: Cookies,
+) -> Result<UserLeaderBoard, StateError> {
+    let user = app_state.get_session(cookies.get(TOKEN))?;
+    app_state.leaderboard.lock().unwrap().get_by_email(&user.email)
 }
 
 async fn quoridor_cpu(cookies: Cookies, State(app_state): State<Arc<AppState>>) -> Result<UserContext, StateError> {
@@ -226,10 +239,11 @@ async fn quoridor_game(
     Path(id): Path<String>,
     State(app_state): State<Arc<AppState>>,
 ) -> Response {
-    let player_recv = match app_state.get_session(cookies.get(TOKEN)) {
-        Ok(user_context) => user_context.email,
+    let user_context = match app_state.get_session(cookies.get(TOKEN)) {
+        Ok(user_context) => user_context,
         Err(err) => return err.into_response(),
     };
+    let email = user_context.email.to_owned();
     ws.on_upgrade(|mut socket: WebSocket| async move {
         let (game, channel_send) = match app_state.quoridor_get_full(&id) {
             Some(payload) => payload,
@@ -246,10 +260,15 @@ async fn quoridor_game(
 
         let mut send_task = tokio::spawn(async move {
             while let Ok(msg) = channel_recv.recv().await {
-                let game_snapshot = to_string(&sender_game.read().unwrap().clone());
-                if let Ok(snapshot) = game_snapshot {
+                let game_snapshot = sender_game.read().unwrap().clone();
+                if let Ok(snapshot) = to_string(&game_snapshot) {
                     let _ = sender.send(snapshot.into()).await;
                     if matches!(msg, PlayerMoveResult::GameFinished) {
+                        app_state
+                            .leaderboard
+                            .lock()
+                            .unwrap()
+                            .process_game(&user_context, &game_snapshot);
                         return;
                     }
                 }
@@ -263,7 +282,7 @@ async fn quoridor_game(
                 }
                 if let Ok(msg) = msg.into_text() {
                     if let Ok(player_move) = from_str::<PlayerMove>(&msg) {
-                        let move_result = game.write().unwrap().make_move(player_move, &player_recv);
+                        let move_result = game.write().unwrap().make_move(player_move, &email);
                         let _ = channel_send.send(move_result);
                     }
                 }
@@ -304,9 +323,11 @@ async fn main() {
 
     let app = Router::new()
         .nest_service("/", ServeDir::new("static/build"))
+        .route("/leaderboard", get(leaderboard))
         .route("/auth/login", post(login))
         .route("/auth/guest_login", post(login_guest))
         .route("/auth/context", get(auth_context))
+        .route("/auth/stats", get(get_personal_stats))
         .route("/auth/logout", delete(logout))
         .route("/auth/register", post(create_user))
         .route("/chat/:id", get(join_chat))
