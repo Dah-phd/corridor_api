@@ -4,7 +4,7 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::errors::StateError;
-use crate::leader_board::UserLeaderBoard;
+use crate::leaderboard::UserLeaderBoard;
 use crate::quoridor::QuoridorMatch;
 
 impl IntoResponse for UserLeaderBoard {

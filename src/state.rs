@@ -5,7 +5,7 @@ use crate::auth::Users;
 use crate::errors::StateError;
 use crate::messages::{ChatMessage, PlayerMoveResult, UserContext};
 use crate::quoridor::QuoridorMatch;
-use crate::leader_board::LeaderBoard;
+use crate::leaderboard::LeaderBoard;
 use rand::{distributions::Alphanumeric, Rng};
 use regex::Regex;
 use tokio::sync::broadcast;

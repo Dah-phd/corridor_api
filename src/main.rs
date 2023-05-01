@@ -1,12 +1,12 @@
 mod auth;
 mod errors;
-mod leader_board;
+mod leaderboard;
 mod messages;
 mod quoridor;
 mod state;
 //internals
 use errors::StateError;
-use leader_board::UserLeaderBoard;
+use leaderboard::UserLeaderBoard;
 use messages::{
     ChatMessage, GuestLogin, PlayerMove, PlayerMoveResult, QuoridorMatchMeta, UserContext, UserCreate, UserLogin,
 };
