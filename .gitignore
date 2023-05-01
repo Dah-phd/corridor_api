@@ -2,5 +2,6 @@
 src/auth/secret_key.rs
 db.sqlite3
 /users
+/games
 /src/test
 \node_modules
